@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
 import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
-import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
+import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado } from '@/lib/webhook'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
 
@@ -140,23 +140,8 @@ export async function PATCH(req: NextRequest, { params }:P) {
     }
     const previewUrl = buildPreviewUrl(req, next.id)
     afterPersist.push(() => logAllanamiento('Autorizado', next.numeroSolicitud, u.username))
-    
-    // Send authorized preview to Discord (with signature)
-    const svgPreview = generateAllanamientoPreviewSVG({
-      numeroSolicitud: next.numeroSolicitud,
-      direccion: next.direccion,
-      sospechoso: next.sospechoso,
-      descripcion: next.descripcion,
-      nombreSolicitante: next.nombreSolicitante,
-      callsignSolicitante: solicitanteCallsign,
-      numeroAgenteSolicitante: solicitanteNumero,
-      estado: next.estado,
-      fechaSolicitud: next.fechaSolicitud,
-      firmaAutorizacion: u.nombre || u.username,
-      callsignAutorizador: autorizadorCallsign,
-      numeroAgenteAutorizador: autorizadorNumero,
-      includeFirma: true,
-    })
+
+    // Reuse the same preview endpoint rendered in UI to keep Discord and app in sync.
     afterPersist.push(() => logAllanamientoAutorizado({
       numero: next.numeroSolicitud,
       direccion: next.direccion,
@@ -168,7 +153,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
       autorizadoPor: u.nombre || u.username,
       callsignAutorizador: autorizadorCallsign,
       numeroAgenteAutorizador: autorizadorNumero,
-      svgPreview,
+      previewUrl,
     }).catch(err => console.error('[PATCH autorizar]', err)))
   }
 

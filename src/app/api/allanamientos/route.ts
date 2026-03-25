@@ -3,9 +3,26 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, err, isUserFrozen, frozen } from '@/lib/auth'
 import { getAllanamientosDB, nextAllNumber, persistAllanamiento, type Allanamiento } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
-import { logAllanamiento, logAllanamientoCreado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
+import { logAllanamiento, logAllanamientoCreado } from '@/lib/webhook'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
+
+function getPublicBaseUrl(req: NextRequest) {
+  const envBase =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.URL
+  if (envBase) return envBase.replace(/\/$/, '')
+  const proto = req.headers.get('x-forwarded-proto') || 'https'
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
+  if (host) return `${proto}://${host}`
+  return new URL(req.url).origin
+}
+
+function buildPreviewUrl(req: NextRequest, allanamientoId: string) {
+  const base = getPublicBaseUrl(req)
+  return `${base}/api/allanamientos/${allanamientoId}/preview-image.png?t=${Date.now()}`
+}
 
 export async function GET(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
@@ -75,19 +92,8 @@ export async function POST(req: NextRequest) {
   }
   logAllanamiento('Creada', all.numeroSolicitud, u.username, direccion)
   
-  // Send preview to Discord (without signature)
-  const svgPreview = generateAllanamientoPreviewSVG({
-    numeroSolicitud: all.numeroSolicitud,
-    direccion: all.direccion,
-    sospechoso: all.sospechoso,
-    descripcion: all.descripcion,
-    nombreSolicitante: all.nombreSolicitante,
-    callsignSolicitante: all.callsignSolicitante,
-    numeroAgenteSolicitante: solicitanteNumero,
-    estado: all.estado,
-    fechaSolicitud: all.fechaSolicitud,
-    includeFirma: false,
-  })
+  // Reuse the same image endpoint shown in allanamientos UI to avoid visual drift.
+  const previewUrl = buildPreviewUrl(req, all.id)
   logAllanamientoCreado({
     numero: all.numeroSolicitud,
     direccion: all.direccion,
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
     solicitadoPor: all.nombreSolicitante,
     callsignSolicitante: all.callsignSolicitante,
     numeroAgenteSolicitante: solicitanteNumero,
-    svgPreview,
+    previewUrl,
   }).catch(err => console.error('[POST allanamientos]', err))
   
   return NextResponse.json({ mensaje:'✅ Solicitud enviada', id:all.id, numero:all.numeroSolicitud }, { status:201 })

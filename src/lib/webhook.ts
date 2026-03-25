@@ -469,12 +469,24 @@ export async function logAllanamientoCreado(input: {
   solicitadoPor: string
   callsignSolicitante?: string | null
   numeroAgenteSolicitante?: string | null
-  svgPreview: string
+  svgPreview?: string
+  previewUrl?: string
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
-    const png = await renderSVGToPNG(input.svgPreview)
+    let png: Buffer
+    if (input.previewUrl) {
+      const res = await fetch(input.previewUrl)
+      if (!res.ok) throw new Error(`Preview URL failed with ${res.status}`)
+      const bytes = await res.arrayBuffer()
+      png = Buffer.from(bytes)
+    } else if (input.svgPreview) {
+      png = await renderSVGToPNG(input.svgPreview)
+    } else {
+      throw new Error('Missing preview image source')
+    }
+
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-solicitud.png`
     const embed = {
       title: '📋 Nueva Solicitud de Allanamiento',
@@ -491,7 +503,6 @@ export async function logAllanamientoCreado(input: {
       footer: { text: 'FIB HQ — Allanamientos' },
     }
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
-      content: '📋 Se registró una nueva solicitud de allanamiento.',
       embeds: [embed],
     })
   } catch (error) {
@@ -510,12 +521,24 @@ export async function logAllanamientoAutorizado(input: {
   autorizadoPor: string
   callsignAutorizador?: string | null
   numeroAgenteAutorizador?: string | null
-  svgPreview: string
+  svgPreview?: string
+  previewUrl?: string
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
-    const png = await renderSVGToPNG(input.svgPreview)
+    let png: Buffer
+    if (input.previewUrl) {
+      const res = await fetch(input.previewUrl)
+      if (!res.ok) throw new Error(`Preview URL failed with ${res.status}`)
+      const bytes = await res.arrayBuffer()
+      png = Buffer.from(bytes)
+    } else if (input.svgPreview) {
+      png = await renderSVGToPNG(input.svgPreview)
+    } else {
+      throw new Error('Missing preview image source')
+    }
+
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
     const embed = {
       title: '✅ Allanamiento Autorizado',
@@ -536,7 +559,6 @@ export async function logAllanamientoAutorizado(input: {
     }
 
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
-      content: '✅ Documento autorizado y registrado en el canal de allanamientos.',
       embeds: [embed],
     })
   } catch (error) {

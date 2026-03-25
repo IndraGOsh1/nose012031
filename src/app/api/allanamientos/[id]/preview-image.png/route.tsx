@@ -5,6 +5,35 @@ export const runtime = 'nodejs'
 
 type P = { params: Promise<{ id: string }> }
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __fibPreviewFontRegular: Promise<ArrayBuffer | null> | undefined
+  // eslint-disable-next-line no-var
+  var __fibPreviewFontBold: Promise<ArrayBuffer | null> | undefined
+}
+
+function loadFont(url: string, slot: 'regular' | 'bold') {
+  const key = slot === 'regular' ? '__fibPreviewFontRegular' : '__fibPreviewFontBold'
+  if (!global[key]) {
+    global[key] = fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null)
+  }
+  return global[key]!
+}
+
+async function getPreviewFonts() {
+  const [regular, bold] = await Promise.all([
+    loadFont('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf', 'regular'),
+    loadFont('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf', 'bold'),
+  ])
+
+  const fonts: Array<{ name: string; data: ArrayBuffer; weight?: number; style?: 'normal' | 'italic' }> = []
+  if (regular) fonts.push({ name: 'Noto Sans', data: regular, weight: 400, style: 'normal' })
+  if (bold) fonts.push({ name: 'Noto Sans', data: bold, weight: 700, style: 'normal' })
+  return fonts
+}
+
 function statusLabel(raw: string) {
   if (raw === 'autorizado') return 'AUTORIZADO'
   if (raw === 'denegado') return 'DENEGADO'
@@ -28,6 +57,7 @@ function buildInfoLines(item: any) {
 }
 
 export async function GET(_req: Request, { params }: P) {
+  const fonts = await getPreviewFonts()
   const { id } = await params
   const db = await getAllanamientosDB()
   const item = db.get(id)
@@ -50,7 +80,7 @@ export async function GET(_req: Request, { params }: P) {
           No encontrado
         </div>
       ),
-      { width: 1920, height: 1080 }
+      { width: 1920, height: 1080, fonts }
     )
   }
 
@@ -59,6 +89,8 @@ export async function GET(_req: Request, { params }: P) {
   const fecha = new Date(item.fechaSolicitud).toLocaleDateString('es')
   const solicitante = `${item.nombreSolicitante}${item.callsignSolicitante ? ` [${item.callsignSolicitante}]` : ''}`
   const firmante = item.firmas?.[0]?.nombre || 'Pendiente'
+  const firmanteCallsign = item.firmas?.[0]?.callsign || '—'
+  const firmaFecha = item.firmas?.[0]?.fecha ? new Date(item.firmas[0].fecha).toLocaleString('es') : 'Sin firma registrada'
   const lines = buildInfoLines(item)
 
   return new ImageResponse(
@@ -72,7 +104,7 @@ export async function GET(_req: Request, { params }: P) {
           background: '#f5f0e8',
           color: '#0f172a',
           padding: '110px 120px 90px',
-          fontFamily: 'Arial, sans-serif',
+          fontFamily: 'Noto Sans, Arial, sans-serif',
           flexDirection: 'column',
         }}
       >
@@ -136,13 +168,18 @@ export async function GET(_req: Request, { params }: P) {
             <span style={{ color: '#a16207', fontSize: 18, letterSpacing: 2, fontFamily: 'monospace' }}>SOLICITANTE</span>
             <span style={{ color: '#0f172a', fontSize: 42, marginTop: 40 }}>{solicitante}</span>
           </div>
-          <div style={{ flex: 1, height: 170, border: '1px solid #c9a227', padding: '34px 30px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, height: 170, border: '1px solid #c9a227', padding: '26px 30px', display: 'flex', flexDirection: 'column', position: 'relative', background: '#fffaf0' }}>
             <span style={{ color: '#a16207', fontSize: 18, letterSpacing: 2, fontFamily: 'monospace' }}>AUTORIZACION OFICIAL</span>
-            <span style={{ color: '#0f172a', fontSize: 42, marginTop: 40 }}>{firmante}</span>
+            <span style={{ color: 'rgba(15,23,42,0.32)', fontSize: 14, letterSpacing: 5, marginTop: 12, fontFamily: 'monospace' }}>FIRMA DIGITAL</span>
+            <span style={{ color: '#0f172a', fontSize: 40, marginTop: 6, fontFamily: 'cursive', transform: 'rotate(-2deg)' }}>{firmante}</span>
+            <span style={{ color: '#64748b', fontSize: 18, marginTop: 2 }}>{firmanteCallsign !== '—' ? `[${firmanteCallsign}]` : '—'}</span>
+            <div style={{ position: 'absolute', right: 24, top: 22, width: 76, height: 76, border: `3px solid ${item.firmas?.length ? '#16a34a' : '#9ca3af'}`, borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.firmas?.length ? '#16a34a' : '#9ca3af', fontSize: 11, fontFamily: 'monospace' }}>VALIDADA</div>
+            <div style={{ position: 'absolute', left: 30, right: 120, bottom: 34, height: 2, background: '#94a3b8', opacity: 0.8 }} />
+            <span style={{ color: '#64748b', fontSize: 15, marginTop: 2, fontFamily: 'monospace' }}>{firmaFecha}</span>
           </div>
         </div>
       </div>
     ),
-    { width: 1920, height: 1080 }
+    { width: 1920, height: 1080, fonts }
   )
 }
