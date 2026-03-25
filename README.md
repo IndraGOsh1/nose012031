@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FIB HQ — Plataforma Web
 
 Sistema interno de gestión para la división FIB. Todo en un solo proyecto Next.js.
@@ -148,3 +149,7 @@ supabase/
 - ✅ **JWT auto-redirect** — El layout detecta tokens expirados y redirige al login
 - ✅ **Notificaciones** — Badge en la campana con tickets abiertos y allanamientos pendientes (polling 30s)
 - ✅ **Módulo Operativos** — Página completa con editor de bloques, filtros y flujo de aprobación
+=======
+# nose012031
+xd
+>>>>>>> 85b7dbfd8c15205d05c7df4f7f83b2b7f7390f6a
