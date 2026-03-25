@@ -396,10 +396,19 @@ export default function AllanamientosPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [viewId,     setViewId]     = useState<string|null>(null)
   const [toast,   setToast]   = useState<{msg:string;ok:boolean}|null>(null)
-  const [filtro,  setFiltro]  = useState('')
+  const [filtro,  setFiltro]  = useState('activos')
 
   useEffect(()=>{ const u=localStorage.getItem('fib_user'); if(u) setUser(JSON.parse(u)) },[])
-  const load = useCallback(async()=>{ setLoading(true); try { const p:any={}; if(filtro) p.estado=filtro; setItems(await getAllanamientos(p)||[]) } catch{} finally{setLoading(false)} },[filtro])
+  const load = useCallback(async()=>{
+    setLoading(true)
+    try {
+      const p:any = {}
+      if (filtro && filtro !== 'activos' && filtro !== 'todos') p.estado = filtro
+      if (filtro === 'todos') p.includeFinalizados = '1'
+      setItems(await getAllanamientos(p) || [])
+    } catch {}
+    finally { setLoading(false) }
+  },[filtro])
   useEffect(()=>{ load() },[load])
   const notify = (msg:string,ok=true) => { setToast({msg,ok}); load() }
   const pendientes = items.filter(i=>i.estado==='pendiente').length
@@ -425,7 +434,8 @@ export default function AllanamientosPage() {
 
       <div className="flex gap-2 mb-4">
         <select className="input py-2 text-xs w-auto" value={filtro} onChange={e=>setFiltro(e.target.value)}>
-          <option value="">Todos los estados</option>
+          <option value="activos">Activos (pendiente/autorizado)</option>
+          <option value="todos">Todos los estados</option>
           {['pendiente','autorizado','denegado','ejecutado'].map(s=><option key={s} value={s}>{s}</option>)}
         </select>
       </div>

@@ -8,11 +8,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado')
   const tipo   = searchParams.get('tipo')
+  const includeFinalizados = searchParams.get('includeFinalizados') === '1'
 
   const TicketsDB = await getTicketsDB()
   let lista = Array.from(TicketsDB.values())
   if (u.rol === 'federal_agent') lista = lista.filter(t => t.creadoPor===u.username || t.asignadoA===u.username)
-  if (estado) lista = lista.filter(t => t.estado===estado)
+  if (estado) {
+    lista = lista.filter(t => t.estado===estado)
+  } else if (!includeFinalizados) {
+    lista = lista.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso')
+  }
   if (tipo)   lista = lista.filter(t => t.tipo===tipo)
   lista.sort((a,b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime())
   return NextResponse.json(lista)

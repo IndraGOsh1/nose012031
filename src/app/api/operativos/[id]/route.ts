@@ -22,10 +22,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const u = getUser(req); if (!u) return unauthorized()
   if (await isUserFrozen(u.id)) return frozen()
+  const isIndra = String(u.username || '').toLowerCase() === 'indra'
   const { id } = await params
   const OpsDB = await getOpsDB()
   const op = OpsDB.get(id); if (!op) return notFound()
-  if (op.creadoPor !== u.username && u.rol !== 'command_staff') return forbidden()
+  if (op.creadoPor !== u.username && u.rol !== 'command_staff' && !isIndra) return forbidden()
   const body = await req.json().catch(()=>({}))
   const now  = new Date().toISOString()
   const next = JSON.parse(JSON.stringify(op)) as typeof op
@@ -74,7 +75,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     next.estado = 'publicado'; next.aprobadoPor = u.username; next.aprobadoEn = now
   }
   if (body.accion === 'rechazar' && ['command_staff','supervisory'].includes(u.rol)) next.estado = 'borrador'
-  if (body.accion === 'archivar' && u.rol === 'command_staff') next.estado = 'archivado'
+  if (body.accion === 'archivar' && (u.rol === 'command_staff' || isIndra)) next.estado = 'archivado'
   if (body.accion === 'pendiente') next.estado = 'pendiente'
   next.actualizadoEn = now
   try {
@@ -88,10 +89,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const u = getUser(req); if (!u) return unauthorized()
   if (await isUserFrozen(u.id)) return frozen()
+  const isIndra = String(u.username || '').toLowerCase() === 'indra'
   const { id } = await params
   const OpsDB = await getOpsDB()
   const op = OpsDB.get(id); if (!op) return notFound()
-  if (op.creadoPor !== u.username && u.rol !== 'command_staff') return forbidden()
+  if (op.creadoPor !== u.username && u.rol !== 'command_staff' && !isIndra) return forbidden()
   try {
     await deleteOperativoById(id)
   } catch {

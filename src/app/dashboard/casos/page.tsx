@@ -18,6 +18,27 @@ const PRIORIDAD_TAG: Record<string,string> = {
   critica: 'tag border-red-700 bg-red-900/20 text-red-400',
 }
 
+function normalizeEvidenceUrl(raw: string) {
+  const input = String(raw || '').trim()
+  if (!input) return ''
+
+  const directImgur = input.match(/^https?:\/\/i\.imgur\.com\/([a-zA-Z0-9]+)(\.(png|jpg|jpeg|webp|gif))?(\?.*)?$/i)
+  if (directImgur) {
+    const ext = directImgur[3] || 'png'
+    return `https://i.imgur.com/${directImgur[1]}.${ext}`
+  }
+
+  const pageImgur = input.match(/^https?:\/\/(?:www\.)?imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)(\?.*)?$/i)
+  if (pageImgur) return `https://i.imgur.com/${pageImgur[1]}.png`
+
+  return input
+}
+
+function isRenderableImageUrl(raw: string) {
+  const input = String(raw || '').trim()
+  return /^https?:\/\//i.test(input) && /(imgur\.com|\.(png|jpg|jpeg|webp|gif)(\?.*)?)$/i.test(input)
+}
+
 // ── Create caso modal — full form ─────────────────────────────────────────
 function ModalCrear({ onClose, onSuccess }: { onClose:()=>void; onSuccess:(m:string)=>void }) {
   const [form, setForm] = useState({ titulo:'', descripcion:'', tipo:'Investigación General', prioridad:'media', unidad:'General', clasificacion:'interno' })
@@ -101,7 +122,7 @@ function SospechosoForm({ onAdd }:{ onAdd:(d:any)=>void }) {
   )
 }
 function EvidenciaForm({ onAdd }:{ onAdd:(d:any)=>void }) {
-  const [f, setF] = useState({ titulo:'', tipo:'imagen', descripcion:'' })
+  const [f, setF] = useState({ titulo:'', tipo:'imagen', descripcion:'', url:'' })
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
@@ -111,7 +132,8 @@ function EvidenciaForm({ onAdd }:{ onAdd:(d:any)=>void }) {
         </select>
       </div>
       <input className="input text-xs py-1.5" placeholder="Descripción" value={f.descripcion} onChange={e=>setF(p=>({...p,descripcion:e.target.value}))} />
-      <button onClick={()=>{if(f.titulo)onAdd(f)}} className="btn-primary text-[9px] py-1.5 justify-center">Agregar</button>
+      <input className="input text-xs py-1.5" placeholder="URL de evidencia (Imgur/PNG/JPG)" value={f.url} onChange={e=>setF(p=>({...p,url:e.target.value}))} />
+      <button onClick={()=>{if(f.titulo)onAdd({...f, url: normalizeEvidenceUrl(f.url)})}} className="btn-primary text-[9px] py-1.5 justify-center">Agregar</button>
     </div>
   )
 }
@@ -384,6 +406,16 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId:string
                         <span className="font-mono text-[8px] text-tx-muted ml-auto">{e.tipo}</span>
                       </div>
                       <p className="text-xs text-tx-secondary">{e.descripcion}</p>
+                      {isRenderableImageUrl(e.url) && (
+                        <a href={normalizeEvidenceUrl(e.url)} target="_blank" rel="noreferrer" className="block mt-2 border border-bg-border hover:opacity-90 transition-opacity">
+                          <img src={normalizeEvidenceUrl(e.url)} alt={e.titulo || 'Evidencia'} className="w-full max-h-60 object-contain bg-black/20" />
+                        </a>
+                      )}
+                      {e.url && (
+                        <a href={normalizeEvidenceUrl(e.url)} target="_blank" rel="noreferrer" className="font-mono text-[8px] text-accent-blue mt-1 inline-block break-all">
+                          {normalizeEvidenceUrl(e.url)}
+                        </a>
+                      )}
                       <p className="font-mono text-[8px] text-tx-muted mt-1">por {e.subidoPor} · {new Date(e.fecha).toLocaleDateString('es')}</p>
                     </div>
                   ))}
@@ -400,18 +432,16 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId:string
               {tab==='timeline' && (
                 <>
                   {caso.timeline.slice().reverse().map((t:any)=>(
-                    <div key={t.id} className="flex items-start gap-3">
-                      <div className="flex flex-col items-center mt-1.5">
-                        <div className="w-2 h-2 rounded-full bg-accent-blue/60 shrink-0" />
-                        <div className="w-px flex-1 bg-bg-border mt-1" />
-                      </div>
-                      <div className="pb-3 min-w-0 flex-1">
+                    <div key={t.id} className="relative pl-6 pb-3">
+                      <div className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full border border-accent-blue/60 bg-accent-blue/25" />
+                      <div className="absolute left-[5px] top-4 bottom-0 w-px bg-gradient-to-b from-accent-blue/40 to-transparent" />
+                      <div className="bg-bg-surface border border-bg-border p-3">
                         <div className="flex items-center gap-2">
-                          <p className="font-mono text-[9px] text-accent-blue uppercase">{t.accion}</p>
+                          <p className="font-mono text-[9px] text-accent-blue uppercase tracking-widest">{t.accion}</p>
                           <span className="font-mono text-[8px] text-tx-muted ml-auto whitespace-nowrap">{new Date(t.fecha).toLocaleString('es',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
                         </div>
-                        {t.detalle && <p className="text-xs text-tx-secondary mt-0.5">{t.detalle}</p>}
-                        <p className="font-mono text-[8px] text-tx-dim mt-0.5">por {t.autor}</p>
+                        {t.detalle && <p className="text-xs text-tx-secondary mt-1">{t.detalle}</p>}
+                        <p className="font-mono text-[8px] text-tx-dim mt-1">por {t.autor}</p>
                       </div>
                     </div>
                   ))}

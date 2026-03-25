@@ -3,16 +3,21 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, err, isUserFrozen, frozen } from '@/lib/auth'
 import { getAllanamientosDB, nextAllNumber, persistAllanamiento, type Allanamiento } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
-import { logAllanamiento } from '@/lib/webhook'
+import { logAllanamiento, logAllanamientoCreado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
 
 export async function GET(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado')
+  const includeFinalizados = searchParams.get('includeFinalizados') === '1'
   const db = await getAllanamientosDB()
   let lista = Array.from(db.values())
   if (u.rol === 'federal_agent') lista = lista.filter(a => a.solicitadoPor === u.username)
-  if (estado) lista = lista.filter(a => a.estado === estado)
+  if (estado) {
+    lista = lista.filter(a => a.estado === estado)
+  } else if (!includeFinalizados) {
+    lista = lista.filter(a => a.estado === 'pendiente' || a.estado === 'autorizado')
+  }
   lista.sort((a,b) => new Date(b.fechaSolicitud).getTime() - new Date(a.fechaSolicitud).getTime())
   return NextResponse.json(lista)
 }
@@ -52,5 +57,27 @@ export async function POST(req: NextRequest) {
     return err('No se pudo persistir la solicitud de allanamiento. Reintenta.', 503)
   }
   logAllanamiento('Creada', all.numeroSolicitud, u.username, direccion)
+  
+  // Send preview to Discord (without signature)
+  const svgPreview = generateAllanamientoPreviewSVG({
+    numeroSolicitud: all.numeroSolicitud,
+    direccion: all.direccion,
+    sospechoso: all.sospechoso,
+    descripcion: all.descripcion,
+    nombreSolicitante: all.nombreSolicitante,
+    callsignSolicitante: all.callsignSolicitante,
+    estado: all.estado,
+    fechaSolicitud: all.fechaSolicitud,
+    includeFirma: false,
+  })
+  logAllanamientoCreado({
+    numero: all.numeroSolicitud,
+    direccion: all.direccion,
+    sospechoso: all.sospechoso,
+    descripcion: all.descripcion,
+    solicitadoPor: all.nombreSolicitante,
+    svgPreview,
+  }).catch(err => console.error('[POST allanamientos]', err))
+  
   return NextResponse.json({ mensaje:'✅ Solicitud enviada', id:all.id, numero:all.numeroSolicitud }, { status:201 })
 }

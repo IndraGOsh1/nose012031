@@ -3,7 +3,9 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
 import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
-import { logAllanamiento, logAllanamientoAutorizadoCard, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo } from '@/lib/webhook'
+import { logAllanamiento, logAllanamientoAutorizadoCard, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
+import { getRows, findAgent, COL } from '@/lib/sheets'
+import { CONFIG } from '@/lib/config'
 
 type P = { params: Promise<{id:string}> }
 
@@ -42,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
   const body = await req.json().catch(()=>({}))
   const now  = new Date().toISOString()
   const isSuperv = ['command_staff','supervisory'].includes(u.rol)
+  const isIndra = String(u.username || '').toLowerCase() === 'indra'
   const userProfile = Array.from(userDB.users.values()).find(us => us.username === u.username)
   const accion = String(body.accion || '')
   const next = JSON.parse(JSON.stringify(a)) as typeof a
@@ -83,6 +86,29 @@ export async function PATCH(req: NextRequest, { params }:P) {
       observaciones: next.observaciones,
       previewUrl,
     }))
+    
+    // Send authorized preview to Discord (with signature)
+    const svgPreview = generateAllanamientoPreviewSVG({
+      numeroSolicitud: next.numeroSolicitud,
+      direccion: next.direccion,
+      sospechoso: next.sospechoso,
+      descripcion: next.descripcion,
+      nombreSolicitante: next.nombreSolicitante,
+      callsignSolicitante: next.callsignSolicitante,
+      estado: next.estado,
+      fechaSolicitud: next.fechaSolicitud,
+      firmaAutorizacion: u.nombre || u.username,
+      includeFirma: true,
+    })
+    afterPersist.push(() => logAllanamientoAutorizado({
+      numero: next.numeroSolicitud,
+      direccion: next.direccion,
+      sospechoso: next.sospechoso,
+      descripcion: next.descripcion,
+      solicitadoPor: next.nombreSolicitante,
+      autorizadoPor: u.nombre || u.username,
+      svgPreview,
+    }).catch(err => console.error('[PATCH autorizar]', err)))
   }
 
   if (accion === 'denegar' && isSuperv) {
@@ -135,7 +161,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
   }
 
   if (accion === 'reporte_hallazgo') {
-    const canReport = isSuperv || next.solicitadoPor === u.username
+    const canReport = isSuperv || isIndra || next.solicitadoPor === u.username
     if (!canReport) return forbidden()
 
     const hallazgo = String(body.hallazgo || '').trim()
@@ -150,8 +176,33 @@ export async function PATCH(req: NextRequest, { params }:P) {
       if (!isValidUrl || !maybeImage) return err('Evidencia invalida. Usa URL de imagen (Imgur/PNG/JPG)')
     }
 
+    let nombreSheet = userProfile?.nombre || u.nombre || u.username
+    let numeroAgente = userProfile?.agentNumber || '—'
+    let callsign = userProfile?.callsign || '—'
+    let lineaSheet = '—'
+
+    try {
+      const rows = await getRows(CONFIG.sheets.personal)
+      const byName = findAgent(rows, String(userProfile?.nombre || u.nombre || u.username || ''))
+      const byNumber = numeroAgente ? findAgent(rows, String(numeroAgente)) : -1
+      const idx = byName >= 0 ? byName : byNumber
+      if (idx >= 0) {
+        const row = rows[idx]
+        nombreSheet = row?.[COL.NOMBRE] || nombreSheet
+        numeroAgente = row?.[COL.NUMERO] || numeroAgente
+        callsign = row?.[COL.APODO] || callsign
+        lineaSheet = String(idx + 1)
+      }
+    } catch {
+      // If spreadsheet is unavailable, fallback to user profile metadata.
+    }
+
     const contenido = [
-      '📌 Informe de Hallazgo',
+      '📌 Informe de Hallazgo (Allanamiento)',
+      `Nombre (columna A): ${nombreSheet}`,
+      `Linea de hoja: ${lineaSheet}`,
+      `N° Agente (columna H): ${numeroAgente}`,
+      `Callsign (columna B): ${callsign}`,
       `Hallazgo: ${hallazgo}`,
       `Propiedad/Ubicación: ${propiedad}`,
       evidenciaUrl ? `Evidencia: ${evidenciaUrl}` : 'Evidencia: —',
@@ -192,7 +243,8 @@ export async function PATCH(req: NextRequest, { params }:P) {
 export async function DELETE(req: NextRequest, { params }:P) {
   const u = getUser(req); if (!u) return unauthorized()
   if (await isUserFrozen(u.id)) return frozen()
-  if (u.rol !== 'command_staff') return forbidden()
+  const isIndra = String(u.username || '').toLowerCase() === 'indra'
+  if (u.rol !== 'command_staff' && !isIndra) return forbidden()
   const { id } = await params
   const db = await getAllanamientosDB()
   if (!db.has(id)) return notFound()

@@ -64,6 +64,7 @@ export async function GET(_req: NextRequest, { params }: P) {
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
   <rect width="1920" height="1080" fill="#f5f0e8"/>
+  <image href="https://i.imgur.com/EAimMhx.png" x="640" y="220" width="640" height="640" opacity="0.06" preserveAspectRatio="xMidYMid meet"/>
   <rect x="120" y="110" width="1680" height="10" fill="#111827"/>
   <rect x="120" y="121" width="1680" height="5" fill="#c9a227"/>
 
@@ -72,7 +73,7 @@ export async function GET(_req: NextRequest, { params }: P) {
   <text x="150" y="315" fill="#334155" font-size="24" letter-spacing="6" font-family="monospace">REPORTE OPERATIVO CLASIFICADO</text>
 
   <text x="1690" y="190" text-anchor="end" fill="#475569" font-size="20" letter-spacing="2" font-family="monospace">N° SOLICITUD</text>
-  <text x="1690" y="250" text-anchor="end" fill="#0f172a" font-size="74" font-weight="700" font-family="Arial, sans-serif">${escapeXml(item.numeroSolicitud)}</text>
+  <text x="1690" y="250" text-anchor="end" fill="#0f172a" font-size="58" font-weight="700" font-family="Arial, sans-serif">${escapeXml(item.numeroSolicitud)}</text>
   <text x="1690" y="295" text-anchor="end" fill="#475569" font-size="24" font-family="monospace">${escapeXml(fecha)}</text>
   <text x="1690" y="335" text-anchor="end" fill="${estadoColor}" font-size="26" font-family="monospace">${escapeXml(estado)}</text>
 

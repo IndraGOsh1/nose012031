@@ -397,7 +397,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex-1 relative overflow-auto">
           {(theme.dashboardBgUrl || DEFAULT_DASHBOARD_BG) && (
             <div className="absolute inset-0 pointer-events-none z-0">
-              <img src={theme.dashboardBgUrl || DEFAULT_DASHBOARD_BG} alt="" className="w-full h-full object-cover opacity-[0.14]"/>
+              <img src={theme.dashboardBgUrl || DEFAULT_DASHBOARD_BG} alt="" className="w-full h-full object-contain object-center opacity-[0.07] blur-[0.4px]"/>
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(17,24,39,0.18),transparent_30%),linear-gradient(180deg,rgba(4,7,12,0.38),rgba(4,7,12,0.92))]" />
             </div>
           )}

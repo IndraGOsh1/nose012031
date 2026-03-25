@@ -196,7 +196,7 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string|null>(null)
   const [toast,   setToast]   = useState<{msg:string;type:ToastType}|null>(null)
-  const [filtroEstado, setFiltroEstado] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('activos')
   const [filtroTipo,   setFiltroTipo]   = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form,    setForm]    = useState({ titulo:'', descripcion:'', tipo:'solicitud', prioridad:'media' })
@@ -208,7 +208,8 @@ export default function TicketsPage() {
     setLoading(true)
     try {
       const p: Record<string,string> = {}
-      if (filtroEstado) p.estado = filtroEstado
+      if (filtroEstado && filtroEstado !== 'activos' && filtroEstado !== 'todos') p.estado = filtroEstado
+      if (filtroEstado === 'todos') p.includeFinalizados = '1'
       if (filtroTipo)   p.tipo   = filtroTipo
       const data = await getTickets(p)
       setTickets(Array.isArray(data)?data:[])
@@ -280,7 +281,8 @@ export default function TicketsPage() {
       {/* Filters */}
       <div className="flex gap-2 mb-4">
         <select className="input py-2 text-xs w-auto" value={filtroEstado} onChange={e=>setFiltroEstado(e.target.value)}>
-          <option value="">Todos los estados</option>
+          <option value="activos">Activos (abierto/en proceso)</option>
+          <option value="todos">Todos los estados</option>
           {['abierto','en_proceso','resuelto','cerrado'].map(s=><option key={s} value={s}>{s}</option>)}
         </select>
         <select className="input py-2 text-xs w-auto" value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)}>

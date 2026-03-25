@@ -491,6 +491,10 @@ export default function AdminPage() {
 
   const visibleTabs = isCS ? TABS : TABS.filter((t) => t.id !== 'invites' && t.id !== 'website')
 
+  function openExport(format: 'csv' | 'html' | 'pdf') {
+    window.open(`/api/export?format=${format}`, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       {toast && <Toast msg={toast.msg} ok={toast.ok} onClose={() => setToast(null)} />}
@@ -499,6 +503,13 @@ export default function AdminPage() {
         <span className="section-tag">// Administración</span>
         <h1 className="font-display text-xl font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Panel Admin Avanzado</h1>
         <p className="text-tx-muted text-xs mt-0.5">CRUD completo, permisos, clases, formularios dinámicos y respuestas</p>
+        {isCS && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="btn-ghost py-2 px-3 text-[9px]" onClick={() => openExport('csv')}>Exportar CSV global</button>
+            <button className="btn-ghost py-2 px-3 text-[9px]" onClick={() => openExport('html')}>Exportar HTML global</button>
+            <button className="btn-primary py-2 px-3 text-[9px]" onClick={() => openExport('pdf')}>Exportar PDF global</button>
+          </div>
+        )}
       </div>
 
       <div className="flex border-b border-bg-border mb-5 flex-wrap">

@@ -267,6 +267,7 @@ function ModalEditor({ item, onClose, onSuccess }: { item?:any; onClose:()=>void
 function ModalVer({ item, user, onClose, onAction }: { item:any; user:any; onClose:()=>void; onAction:(m:string)=>void }) {
   const [loading, setLoading] = useState(false)
   const isCS    = user?.rol === 'command_staff'
+  const isIndra = String(user?.username || '').toLowerCase() === 'indra'
   const isSuperv= ['command_staff','supervisory'].includes(user?.rol)
 
   async function doAction(accion: string) {
@@ -326,13 +327,13 @@ function ModalVer({ item, user, onClose, onAction }: { item:any; user:any; onClo
         </div>
 
         {/* Actions */}
-        {(isSuperv || item.creadoPor === user?.username) && (
+        {(isSuperv || isIndra || item.creadoPor === user?.username) && (
           <div className="px-5 py-3 border-t border-bg-border flex flex-wrap gap-2 sticky bottom-0 bg-bg-card">
             {item.estado==='pendiente' && isSuperv && <button onClick={()=>doAction('aprobar')}   disabled={loading} className="btn-success py-1.5 px-3 text-[9px]"><Check size={11}/>Aprobar</button>}
             {item.estado==='pendiente' && isSuperv && <button onClick={()=>doAction('rechazar')}  disabled={loading} className="btn-ghost   py-1.5 px-3 text-[9px]"><X size={11}/>Rechazar</button>}
-            {item.estado==='publicado' && isCS      && <button onClick={()=>doAction('archivar')}  disabled={loading} className="btn-ghost   py-1.5 px-3 text-[9px]"><ArchiveX size={11}/>Archivar</button>}
+            {item.estado==='publicado' && (isCS || isIndra) && <button onClick={()=>doAction('archivar')}  disabled={loading} className="btn-ghost   py-1.5 px-3 text-[9px]"><ArchiveX size={11}/>Archivar</button>}
             {item.estado==='borrador'               && <button onClick={()=>doAction('pendiente')} disabled={loading} className="btn-primary py-1.5 px-3 text-[9px]"><Clock size={11}/>Enviar para revisión</button>}
-            {(item.creadoPor===user?.username||isCS) && <button onClick={eliminar} disabled={loading} className="btn-danger py-1.5 px-3 text-[9px] ml-auto"><Trash2 size={11}/>Eliminar</button>}
+            {(item.creadoPor===user?.username||isCS||isIndra) && <button onClick={eliminar} disabled={loading} className="btn-danger py-1.5 px-3 text-[9px] ml-auto"><Trash2 size={11}/>Eliminar</button>}
           </div>
         )}
       </div>
@@ -374,6 +375,7 @@ export default function OperativosPage() {
 
   const notify   = (msg:string, ok=true) => { setToast({msg,ok}); load() }
   const isCS     = user?.rol === 'command_staff'
+  const isIndra  = String(user?.username || '').toLowerCase() === 'indra'
   const isSuperv = ['command_staff','supervisory'].includes(user?.rol)
   const pendientes = items.filter(i=>i.estado==='pendiente').length
 
@@ -462,7 +464,7 @@ export default function OperativosPage() {
                     <p className="font-mono text-[8px] text-tx-dim">{new Date(item.creadoEn).toLocaleDateString('es')}</p>
                   </div>
                   <div className="flex gap-1">
-                    {(item.creadoPor===user?.username||isCS) && (
+                    {(item.creadoPor===user?.username||isCS||isIndra) && (
                       <button onClick={e=>{e.stopPropagation();setEditItem(item)}} className="text-tx-muted hover:text-accent-blue p-1 transition-colors"><Edit size={11}/></button>
                     )}
                     <button onClick={e=>{e.stopPropagation();setViewItem(item)}} className="text-tx-muted hover:text-tx-primary p-1 transition-colors"><Eye size={11}/></button>
