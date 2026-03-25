@@ -21,6 +21,9 @@ export interface ConfigVisual {
     datos: string[]
     imagenes: string[]
     googleFormId: string
+    googleFormOpen: boolean
+    googleResponsesSheetId: string
+    googleResponsesRange: string
     formularioIntro: string
     formularioPasos: string[]
   }
@@ -79,6 +82,9 @@ const DEFAULT: ConfigVisual = {
     datos: ['Convocatoria abierta por periodos', 'Requiere cuenta activa', 'Un envio por usuario o IP'],
     imagenes: ['https://i.imgur.com/7NxeszI.png'],
     googleFormId: '1HaC8ZxgE4dCHu57ZB9IhzGDoNsRmriDccGg3BD_kX94',
+    googleFormOpen: true,
+    googleResponsesSheetId: '',
+    googleResponsesRange: 'A:Z',
     formularioIntro: 'Completa el formulario de forma simple y en un solo envio. Adjunta evidencia solo cuando se solicite.',
     formularioPasos: ['Lee los requisitos', 'Completa datos personales', 'Revisa respuestas antes de enviar'],
   },

@@ -3,6 +3,21 @@ import { getUser, forbidden } from '@/lib/auth'
 import { ConfigVisualDB } from '@/lib/config-visual-db'
 import { sanitizeGoogleFormRef } from '@/lib/google-forms'
 
+function sanitizeSheetRef(raw: any) {
+  const value = String(raw || '').trim()
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value)
+      const match = url.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/i)
+      return String(match?.[1] || '').trim().slice(0, 200)
+    } catch {
+      return value.replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 200)
+    }
+  }
+  return value.replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 200)
+}
+
 function sanitizeOposicionesInfo(raw: any) {
   const source = raw && typeof raw === 'object' ? raw : {}
   const datos = Array.isArray(source.datos)
@@ -18,6 +33,9 @@ function sanitizeOposicionesInfo(raw: any) {
     datos,
     imagenes,
     googleFormId: sanitizeGoogleFormRef(source.googleFormId),
+    googleFormOpen: source.googleFormOpen !== false,
+    googleResponsesSheetId: sanitizeSheetRef(source.googleResponsesSheetId),
+    googleResponsesRange: String(source.googleResponsesRange || 'A:Z').trim().slice(0, 60),
     formularioIntro: String(source.formularioIntro || '').trim().slice(0, 1200),
     formularioPasos: Array.isArray(source.formularioPasos)
       ? source.formularioPasos.map((x: any) => String(x || '').trim().slice(0, 180)).filter(Boolean).slice(0, 8)

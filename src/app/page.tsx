@@ -85,6 +85,9 @@ type LandingConfig = {
     datos?: string[]
     imagenes?: string[]
     googleFormId?: string
+    googleFormOpen?: boolean
+    googleResponsesSheetId?: string
+    googleResponsesRange?: string
     formularioIntro?: string
     formularioPasos?: string[]
   }
@@ -156,6 +159,7 @@ export default function Home() {
   const oposDatos = Array.isArray(oposInfo.datos) ? oposInfo.datos : []
   const oposImagenes = Array.isArray(oposInfo.imagenes) ? oposInfo.imagenes : []
   const configuredFormId = String(oposInfo.googleFormId || '').trim()
+  const googleFormOpen = oposInfo.googleFormOpen !== false
   const googleFormRef = configuredFormId || 'd:1HaC8ZxgE4dCHu57ZB9IhzGDoNsRmriDccGg3BD_kX94'
   const { embedUrl: googleFormEmbedUrl, openUrl: googleFormOpenUrl } = buildGoogleFormUrls(googleFormRef)
   const ws = {
@@ -373,13 +377,21 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <iframe
-              title="Formulario de Oposiciones"
-              src={googleFormEmbedUrl}
-              className="w-full h-[560px] border border-bg-border bg-black"
-              loading="lazy"
-            />
-            <a href={googleFormOpenUrl} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-blue hover:underline mt-2 inline-block">Abrir formulario en nueva pestaña</a>
+            {googleFormOpen ? (
+              <>
+                <iframe
+                  title="Formulario de Oposiciones"
+                  src={googleFormEmbedUrl}
+                  className="w-full h-[560px] border border-bg-border bg-black"
+                  loading="lazy"
+                />
+                <a href={googleFormOpenUrl} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-blue hover:underline mt-2 inline-block">Abrir formulario en nueva pestaña</a>
+              </>
+            ) : (
+              <div className="w-full h-[220px] border border-red-800/40 bg-red-950/20 flex items-center justify-center px-4 text-center">
+                <p className="font-mono text-xs tracking-widest uppercase text-red-300">Recepción de formularios cerrada temporalmente</p>
+              </div>
+            )}
 
             <div className="mt-5 pt-4 border-t border-bg-border">
               <span className="section-tag">// Novedades de Oposiciones</span>

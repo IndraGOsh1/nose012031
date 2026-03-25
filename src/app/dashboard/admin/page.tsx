@@ -26,6 +26,7 @@ import {
   getForms,
   saveForm,
   submitForm,
+  getGoogleFormResponses,
   getFormResponses,
   deleteFormResponse,
   getConfigVisual,
@@ -122,6 +123,9 @@ export default function AdminPage() {
   const [formsBusy, setFormsBusy] = useState(false)
   const [responses, setResponses] = useState<any[]>([])
   const [selectedFormForResponses, setSelectedFormForResponses] = useState<string>('')
+  const [googleRows, setGoogleRows] = useState<any[]>([])
+  const [googleHeaders, setGoogleHeaders] = useState<string[]>([])
+  const [googleBusy, setGoogleBusy] = useState(false)
   const [formAnswers, setFormAnswers] = useState<Record<string, Record<string, any>>>({})
   const [formStartedAt, setFormStartedAt] = useState<Record<string, number>>({})
   const [websiteConfig, setWebsiteConfig] = useState<any>(null)
@@ -169,8 +173,9 @@ export default function AdminPage() {
   async function loadForms() {
     setLoading(true)
     try {
-      const data = await getForms()
+      const [data, cfg] = await Promise.all([getForms(), getConfigVisual()])
       setFormsData(data)
+      setWebsiteConfig(cfg)
       const started: Record<string, number> = {}
       for (const f of data.forms || []) started[f.id] = Date.now()
       setFormStartedAt(started)
@@ -475,6 +480,40 @@ export default function AdminPage() {
     }
   }
 
+  async function saveGoogleFormSettings(nextPatch: any) {
+    if (!isCS || !websiteConfig) return
+    setGoogleBusy(true)
+    try {
+      const opos = {
+        ...(websiteConfig.oposicionesInfo || {}),
+        ...nextPatch,
+      }
+      await setConfigVisual({ oposicionesInfo: opos })
+      setWebsiteConfig((prev: any) => ({ ...prev, oposicionesInfo: opos }))
+      setToast({ msg: 'Configuración Google Forms guardada', ok: true })
+    } catch (e: any) {
+      setToast({ msg: e.message || 'No se pudo guardar configuración Google Forms', ok: false })
+    } finally {
+      setGoogleBusy(false)
+    }
+  }
+
+  async function loadGoogleResponses() {
+    setGoogleBusy(true)
+    try {
+      const data = await getGoogleFormResponses()
+      setGoogleHeaders(Array.isArray(data.headers) ? data.headers : [])
+      setGoogleRows(Array.isArray(data.rows) ? data.rows : [])
+      setToast({ msg: `Respuestas Google cargadas (${Number(data.count || 0)})`, ok: true })
+    } catch (e: any) {
+      setToast({ msg: e.message || 'No se pudieron cargar respuestas de Google', ok: false })
+      setGoogleHeaders([])
+      setGoogleRows([])
+    } finally {
+      setGoogleBusy(false)
+    }
+  }
+
   const filtrados = useMemo(() => invites.filter((i) => {
     if (filtro === 'activos') return !i.agotado
     if (filtro === 'agotados') return i.agotado
@@ -648,6 +687,96 @@ export default function AdminPage() {
 
       {tab === 'forms' && (
         <div className="space-y-4">
+          <div className="border border-cyan-500/30 bg-slate-950/60 backdrop-blur-xl rounded-xl p-4">
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Settings2 size={14} className="text-cyan-300" />
+                <span className="section-tag">// Google Forms (Oposiciones)</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => saveGoogleFormSettings({ googleFormOpen: !((websiteConfig?.oposicionesInfo?.googleFormOpen ?? true)) })}
+                  disabled={!isCS || googleBusy}
+                  className={`px-3 py-1.5 border font-mono text-[9px] uppercase tracking-widest ${websiteConfig?.oposicionesInfo?.googleFormOpen ?? true ? 'border-green-700 text-green-300' : 'border-red-700 text-red-300'} disabled:opacity-50`}
+                >
+                  {websiteConfig?.oposicionesInfo?.googleFormOpen ?? true ? 'Recepción Google: Abierta' : 'Recepción Google: Cerrada'}
+                </button>
+                <button onClick={loadGoogleResponses} disabled={googleBusy} className="btn-ghost py-1.5">
+                  {googleBusy ? 'Cargando...' : 'Ver respuestas Google'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Sheet ID de respuestas</label>
+                <input
+                  className="input text-xs py-2"
+                  value={websiteConfig?.oposicionesInfo?.googleResponsesSheetId || ''}
+                  onChange={(e) => setWebsiteConfig((p: any) => ({
+                    ...p,
+                    oposicionesInfo: {
+                      ...(p?.oposicionesInfo || {}),
+                      googleResponsesSheetId: e.target.value,
+                    },
+                  }))}
+                  placeholder="ID o URL de Google Sheet"
+                />
+              </div>
+              <div>
+                <label className="label">Rango de lectura</label>
+                <input
+                  className="input text-xs py-2"
+                  value={websiteConfig?.oposicionesInfo?.googleResponsesRange || 'A:Z'}
+                  onChange={(e) => setWebsiteConfig((p: any) => ({
+                    ...p,
+                    oposicionesInfo: {
+                      ...(p?.oposicionesInfo || {}),
+                      googleResponsesRange: e.target.value,
+                    },
+                  }))}
+                  placeholder="Respuestas de formulario 1!A:Z"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => saveGoogleFormSettings({
+                  googleResponsesSheetId: websiteConfig?.oposicionesInfo?.googleResponsesSheetId || '',
+                  googleResponsesRange: websiteConfig?.oposicionesInfo?.googleResponsesRange || 'A:Z',
+                })}
+                disabled={!isCS || googleBusy}
+                className="btn-primary py-2 disabled:opacity-50"
+              >
+                Guardar origen de respuestas
+              </button>
+            </div>
+
+            {googleRows.length > 0 && (
+              <div className="mt-4 border border-bg-border rounded-lg overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-bg-border">
+                      {googleHeaders.map((h) => (
+                        <th key={h} className="table-head whitespace-nowrap">{h || 'Columna'}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {googleRows.map((row: any) => (
+                      <tr key={row.id} className="table-row">
+                        {googleHeaders.map((h) => (
+                          <td key={`${row.id}-${h}`} className="table-cell text-xs text-tx-secondary align-top">{row?.values?.[h] || '—'}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           <div className="border border-indigo-500/30 bg-slate-950/60 backdrop-blur-xl rounded-xl p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2"><Settings2 size={14} className="text-indigo-300" /><span className="section-tag">// Módulo Global de Formularios</span></div>

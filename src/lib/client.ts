@@ -109,6 +109,7 @@ export const resetConfigVisual = () => api<any>('/config-visual',{method:'DELETE
 export const getForms = () => api<any>('/forms')
 export const saveForm = (b:any) => api<any>('/forms',{method:'POST',body:JSON.stringify(b)})
 export const submitForm = (id:string,b:any) => api<any>(`/forms/${id}/submit`,{method:'POST',body:JSON.stringify(b)})
+export const getGoogleFormResponses = () => api<any>('/forms/google-responses')
 export const getFormResponses = (id:string) => api<any>(`/forms/${id}/responses`)
 export const editFormResponse = (id:string,b:any) => api<any>(`/forms/${id}/responses`,{method:'PATCH',body:JSON.stringify(b)})
 export const deleteFormResponse = (id:string,submissionId:string) => api<any>(`/forms/${id}/responses`,{method:'DELETE',body:JSON.stringify({submissionId})})
