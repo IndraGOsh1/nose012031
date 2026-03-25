@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
 import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
-import { logAllanamiento, logAllanamientoAutorizadoCard, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
+import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
 
@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
   const body = await req.json().catch(()=>({}))
   const now  = new Date().toISOString()
   const isSuperv = ['command_staff','supervisory'].includes(u.rol)
+  const isCS = u.rol === 'command_staff'
   const isIndra = String(u.username || '').toLowerCase() === 'indra'
   const userProfile = Array.from(userDB.users.values()).find(us => us.username === u.username)
   const accion = String(body.accion || '')
@@ -58,6 +59,46 @@ export async function PATCH(req: NextRequest, { params }:P) {
     next.mensajes.push({
       id: uuid().slice(0,8), autor:u.username, nombre:u.nombre||u.username,
       contenido, fecha:now, tipo:'mensaje'
+    })
+  }
+
+  if (accion === 'editar') {
+    const canEdit = isCS || isIndra
+    if (!canEdit) return forbidden()
+
+    const direccion = body.direccion !== undefined ? String(body.direccion || '').trim() : next.direccion
+    const motivacion = body.motivacion !== undefined ? String(body.motivacion || '').trim() : next.motivacion
+    const descripcion = body.descripcion !== undefined ? String(body.descripcion || '').trim() : next.descripcion
+    const sospechoso = body.sospechoso !== undefined ? String(body.sospechoso || '').trim() : next.sospechoso
+    const unidad = body.unidad !== undefined ? String(body.unidad || '').trim() : next.unidad
+    const observaciones = body.observaciones !== undefined ? String(body.observaciones || '').trim() : next.observaciones
+    const numeroSolicitud = body.numeroSolicitud !== undefined ? String(body.numeroSolicitud || '').trim() : next.numeroSolicitud
+
+    if (!direccion) return err('Direccion es requerida')
+    if (!motivacion) return err('Motivacion es requerida')
+    if (!numeroSolicitud) return err('Numero de solicitud es requerido')
+    if (direccion.length > 180) return err('Direccion demasiado larga (maximo 180)')
+    if (motivacion.length > 3000) return err('Motivacion demasiado larga (maximo 3000)')
+    if (descripcion.length > 3000) return err('Descripcion demasiado larga (maximo 3000)')
+    if (sospechoso.length > 180) return err('Sospechoso demasiado largo (maximo 180)')
+    if (unidad.length > 80) return err('Unidad demasiado larga (maximo 80)')
+    if (observaciones.length > 1200) return err('Observaciones demasiado largas (maximo 1200)')
+    if (numeroSolicitud.length > 80) return err('Numero de solicitud demasiado largo (maximo 80)')
+
+    next.direccion = direccion
+    next.motivacion = motivacion
+    next.descripcion = descripcion
+    next.sospechoso = sospechoso || 'Sin identificar'
+    next.unidad = unidad || 'General'
+    next.observaciones = observaciones
+    next.numeroSolicitud = numeroSolicitud
+    next.mensajes.push({
+      id: uuid().slice(0,8),
+      autor: 'SYSTEM',
+      nombre: 'Sistema',
+      contenido: `✏️ Solicitud editada por ${u.nombre || u.username}`,
+      fecha: now,
+      tipo: 'accion',
     })
   }
 
@@ -76,16 +117,29 @@ export async function PATCH(req: NextRequest, { params }:P) {
       if (observaciones.length > 1200) return err('Observaciones demasiado largas (maximo 1200)')
       next.observaciones = observaciones
     }
+    let solicitanteCallsign = next.callsignSolicitante || null
+    let solicitanteNumero = '—'
+    let autorizadorCallsign = userProfile?.callsign || null
+    let autorizadorNumero = userProfile?.agentNumber || '—'
+    try {
+      const rows = await getRows(CONFIG.sheets.personal)
+      const idxSolic = findAgent(rows, String(next.nombreSolicitante || next.solicitadoPor || ''))
+      if (idxSolic >= 0) {
+        solicitanteCallsign = rows[idxSolic]?.[COL.APODO] || solicitanteCallsign
+        solicitanteNumero = rows[idxSolic]?.[COL.NUMERO] || solicitanteNumero
+      }
+      const idxAuthByName = findAgent(rows, String(userProfile?.nombre || u.nombre || u.username || ''))
+      const idxAuthByNum = autorizadorNumero ? findAgent(rows, String(autorizadorNumero)) : -1
+      const idxAuth = idxAuthByName >= 0 ? idxAuthByName : idxAuthByNum
+      if (idxAuth >= 0) {
+        autorizadorCallsign = rows[idxAuth]?.[COL.APODO] || autorizadorCallsign
+        autorizadorNumero = rows[idxAuth]?.[COL.NUMERO] || autorizadorNumero
+      }
+    } catch {
+      // Fallback to local profile metadata when sheets is unavailable.
+    }
     const previewUrl = buildPreviewUrl(req, next.id)
     afterPersist.push(() => logAllanamiento('Autorizado', next.numeroSolicitud, u.username))
-    afterPersist.push(() => logAllanamientoAutorizadoCard({
-      numero: next.numeroSolicitud,
-      direccion: next.direccion,
-      solicitadoPor: next.nombreSolicitante,
-      autorizadoPor: u.nombre || u.username,
-      observaciones: next.observaciones,
-      previewUrl,
-    }))
     
     // Send authorized preview to Discord (with signature)
     const svgPreview = generateAllanamientoPreviewSVG({
@@ -94,10 +148,13 @@ export async function PATCH(req: NextRequest, { params }:P) {
       sospechoso: next.sospechoso,
       descripcion: next.descripcion,
       nombreSolicitante: next.nombreSolicitante,
-      callsignSolicitante: next.callsignSolicitante,
+      callsignSolicitante: solicitanteCallsign,
+      numeroAgenteSolicitante: solicitanteNumero,
       estado: next.estado,
       fechaSolicitud: next.fechaSolicitud,
       firmaAutorizacion: u.nombre || u.username,
+      callsignAutorizador: autorizadorCallsign,
+      numeroAgenteAutorizador: autorizadorNumero,
       includeFirma: true,
     })
     afterPersist.push(() => logAllanamientoAutorizado({
@@ -106,7 +163,11 @@ export async function PATCH(req: NextRequest, { params }:P) {
       sospechoso: next.sospechoso,
       descripcion: next.descripcion,
       solicitadoPor: next.nombreSolicitante,
+      callsignSolicitante: solicitanteCallsign,
+      numeroAgenteSolicitante: solicitanteNumero,
       autorizadoPor: u.nombre || u.username,
+      callsignAutorizador: autorizadorCallsign,
+      numeroAgenteAutorizador: autorizadorNumero,
       svgPreview,
     }).catch(err => console.error('[PATCH autorizar]', err)))
   }
@@ -226,7 +287,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
     }))
   }
 
-  if (accion && !['autorizar', 'denegar', 'ejecutar', 'firmar', 'generar_pdf', 'reporte_hallazgo'].includes(accion)) {
+  if (accion && !['autorizar', 'denegar', 'ejecutar', 'firmar', 'generar_pdf', 'reporte_hallazgo', 'editar'].includes(accion)) {
     return err('Accion invalida')
   }
 

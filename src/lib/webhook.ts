@@ -342,16 +342,23 @@ export function generateAllanamientoPreviewSVG(input: {
   descripcion: string
   nombreSolicitante: string
   callsignSolicitante: string | null
+  numeroAgenteSolicitante?: string | null
   estado: string
   fechaSolicitud: string
   firmaAutorizacion?: string
+  callsignAutorizador?: string | null
+  numeroAgenteAutorizador?: string | null
   includeFirma?: boolean
 }): string {
   const estado = statusLabel(input.estado)
   const estadoColor = statusColor(input.estado)
   const fecha = new Date(input.fechaSolicitud).toLocaleDateString('es')
   const solicitante = `${input.nombreSolicitante}${input.callsignSolicitante ? ` [${input.callsignSolicitante}]` : ''}`
+  const solicitanteMeta = `N° ${input.numeroAgenteSolicitante || '—'}`
   const firmaText = input.includeFirma ? (input.firmaAutorizacion || 'Pendiente') : ''
+  const firmaMeta = input.includeFirma
+    ? `${input.callsignAutorizador ? `[${input.callsignAutorizador}] ` : ''}N° ${input.numeroAgenteAutorizador || '—'}`
+    : ''
 
   const lines = [
     `Dirección: ${input.direccion}`,
@@ -386,9 +393,11 @@ export function generateAllanamientoPreviewSVG(input: {
   <rect x="150" y="820" width="780" height="170" fill="none" stroke="#c9a227"/>
   <rect x="990" y="820" width="780" height="170" fill="none" stroke="#c9a227"/>
   <text x="180" y="870" fill="#a16207" font-size="18" letter-spacing="2" font-family="monospace">SOLICITANTE</text>
-  <text x="180" y="940" fill="#0f172a" font-size="42" font-family="Arial, sans-serif">${escapeXml(solicitante)}</text>
+  <text x="180" y="930" fill="#0f172a" font-size="38" font-family="Arial, sans-serif">${escapeXml(solicitante)}</text>
+  <text x="180" y="972" fill="#475569" font-size="24" font-family="Arial, sans-serif">${escapeXml(solicitanteMeta)}</text>
   <text x="1020" y="870" fill="#a16207" font-size="18" letter-spacing="2" font-family="monospace">AUTORIZACIÓN OFICIAL</text>
-  <text x="1020" y="940" fill="#0f172a" font-size="42" font-family="Arial, sans-serif">${escapeXml(firmaText)}</text>
+  <text x="1020" y="930" fill="#0f172a" font-size="38" font-family="Arial, sans-serif">${escapeXml(firmaText)}</text>
+  <text x="1020" y="972" fill="#475569" font-size="24" font-family="Arial, sans-serif">${escapeXml(firmaMeta)}</text>
 
   <text x="960" y="760" text-anchor="middle" fill="rgba(34,197,94,0.12)" font-size="140" font-weight="700" letter-spacing="5" transform="rotate(-28, 960, 760)" font-family="Arial, sans-serif">${escapeXml(estado)}</text>
 </svg>`
@@ -437,6 +446,8 @@ export async function logAllanamientoCreado(input: {
   sospechoso: string
   descripcion: string
   solicitadoPor: string
+  callsignSolicitante?: string | null
+  numeroAgenteSolicitante?: string | null
   svgPreview: string
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
@@ -444,7 +455,13 @@ export async function logAllanamientoCreado(input: {
   try {
     const png = await renderSVGToPNG(input.svgPreview)
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-solicitud.png`
-    const message = `📋 **Nueva Solicitud de Allanamiento**\n\`${input.numero}\` | ${input.direccion}`
+    const message = [
+      '📋 **Nueva Solicitud de Allanamiento**',
+      `\`${input.numero}\` | ${input.direccion}`,
+      `Solicitante: ${input.solicitadoPor}`,
+      `Callsign: ${input.callsignSolicitante || '—'}`,
+      `N° Agente: ${input.numeroAgenteSolicitante || '—'}`,
+    ].join('\n')
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, message)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento creado:', error)
@@ -457,7 +474,11 @@ export async function logAllanamientoAutorizado(input: {
   sospechoso: string
   descripcion: string
   solicitadoPor: string
+  callsignSolicitante?: string | null
+  numeroAgenteSolicitante?: string | null
   autorizadoPor: string
+  callsignAutorizador?: string | null
+  numeroAgenteAutorizador?: string | null
   svgPreview: string
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
@@ -465,7 +486,16 @@ export async function logAllanamientoAutorizado(input: {
   try {
     const png = await renderSVGToPNG(input.svgPreview)
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
-    const message = `✅ **Allanamiento Autorizado**\n\`${input.numero}\` | ${input.direccion}\nAutorizado por: ${input.autorizadoPor}`
+    const message = [
+      '✅ **Allanamiento Autorizado**',
+      `\`${input.numero}\` | ${input.direccion}`,
+      `Solicitante: ${input.solicitadoPor}`,
+      `Callsign solicitante: ${input.callsignSolicitante || '—'}`,
+      `N° agente solicitante: ${input.numeroAgenteSolicitante || '—'}`,
+      `Autorizado por: ${input.autorizadoPor}`,
+      `Callsign autorizador: ${input.callsignAutorizador || '—'}`,
+      `N° agente autorizador: ${input.numeroAgenteAutorizador || '—'}`,
+    ].join('\n')
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, message)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento autorizado:', error)

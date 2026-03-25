@@ -73,6 +73,7 @@ export const getAllanamientos    = (p?:Record<string,string>) => api<any>('/alla
 export const getAllanamiento     = (id:string) => api<any>(`/allanamientos/${id}`)
 export const crearAllanamiento  = (b:any) => api<any>('/allanamientos',{method:'POST',body:JSON.stringify(b)})
 export const editarAllanamiento = (id:string,b:any) => api<any>(`/allanamientos/${id}`,{method:'PATCH',body:JSON.stringify(b)})
+export const borrarAllanamiento = (id:string) => api<any>(`/allanamientos/${id}`,{method:'DELETE'})
 
 // Tickets
 export const getTickets   = (p?:Record<string,string>) => api<any>('/tickets'+(p?'?'+new URLSearchParams(p):''))

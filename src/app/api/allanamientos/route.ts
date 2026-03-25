@@ -4,6 +4,8 @@ import { getUser, unauthorized, err, isUserFrozen, frozen } from '@/lib/auth'
 import { getAllanamientosDB, nextAllNumber, persistAllanamiento, type Allanamiento } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
 import { logAllanamiento, logAllanamientoCreado, generateAllanamientoPreviewSVG } from '@/lib/webhook'
+import { getRows, findAgent, COL } from '@/lib/sheets'
+import { CONFIG } from '@/lib/config'
 
 export async function GET(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
@@ -29,6 +31,21 @@ export async function POST(req: NextRequest) {
   if (!direccion?.trim() || !motivacion?.trim()) return err('direccion y motivacion son requeridos')
   const [allDB, userDB] = await Promise.all([getAllanamientosDB(), getDB()])
   const userProfile = Array.from(userDB.users.values()).find(us => us.username === u.username)
+  let solicitanteCallsign = userProfile?.callsign || null
+  let solicitanteNumero = userProfile?.agentNumber || null
+  try {
+    const rows = await getRows(CONFIG.sheets.personal)
+    const byName = findAgent(rows, String(userProfile?.nombre || u.nombre || u.username || ''))
+    const byUser = findAgent(rows, String(u.username || ''))
+    const byNumber = solicitanteNumero ? findAgent(rows, String(solicitanteNumero)) : -1
+    const idx = byName >= 0 ? byName : (byUser >= 0 ? byUser : byNumber)
+    if (idx >= 0) {
+      solicitanteCallsign = rows[idx]?.[COL.APODO] || solicitanteCallsign
+      solicitanteNumero = rows[idx]?.[COL.NUMERO] || solicitanteNumero
+    }
+  } catch {
+    // Fallback to local profile metadata when sheets is unavailable.
+  }
   const now = new Date().toISOString()
   const numeroSolicitud = nextAllNumber()
   const all: Allanamiento = {
@@ -40,7 +57,7 @@ export async function POST(req: NextRequest) {
     casoVinculado:casoVinculado||null,
     estado:'pendiente',
     solicitadoPor:u.username, nombreSolicitante:u.nombre||u.username,
-    callsignSolicitante: userProfile?.callsign||null,
+    callsignSolicitante: solicitanteCallsign,
     unidad:unidad||'General',
     fechaSolicitud:now, firmas:[],
     motivoDenegacion:null, observaciones:'',
@@ -66,6 +83,7 @@ export async function POST(req: NextRequest) {
     descripcion: all.descripcion,
     nombreSolicitante: all.nombreSolicitante,
     callsignSolicitante: all.callsignSolicitante,
+    numeroAgenteSolicitante: solicitanteNumero,
     estado: all.estado,
     fechaSolicitud: all.fechaSolicitud,
     includeFirma: false,
@@ -76,6 +94,8 @@ export async function POST(req: NextRequest) {
     sospechoso: all.sospechoso,
     descripcion: all.descripcion,
     solicitadoPor: all.nombreSolicitante,
+    callsignSolicitante: all.callsignSolicitante,
+    numeroAgenteSolicitante: solicitanteNumero,
     svgPreview,
   }).catch(err => console.error('[POST allanamientos]', err))
   

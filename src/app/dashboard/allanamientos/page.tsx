@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Send, FileText, Check, XCircle, PenTool } from 'lucide-react'
-import { getAllanamientos, crearAllanamiento, editarAllanamiento, getAllanamiento } from '@/lib/client'
+import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Send, FileText, Check, XCircle, PenTool, Trash2, Pencil } from 'lucide-react'
+import { getAllanamientos, crearAllanamiento, editarAllanamiento, getAllanamiento, borrarAllanamiento } from '@/lib/client'
 
 const ESTADO_TAG: Record<string,string> = {
   pendiente:  'tag border-yellow-700 bg-yellow-900/20 text-yellow-400',
@@ -74,13 +74,38 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId:string;
   const scrollRef = useRef<HTMLDivElement>(null)
   const atBottomRef = useRef(true)
   const isSuperv = ['command_staff','supervisory'].includes(user?.rol)
+  const isCS = user?.rol === 'command_staff'
+  const [editForm, setEditForm] = useState({
+    numeroSolicitud: '',
+    direccion: '',
+    sospechoso: '',
+    unidad: 'General',
+    motivacion: '',
+    descripcion: '',
+    observaciones: '',
+  })
 
   function extractImageUrl(raw: string) {
     const match = String(raw || '').match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i)
     return match ? match[0] : ''
   }
 
-  const load = useCallback(async()=>{ try { const d = await getAllanamiento(itemId); setItem(d) } catch {} finally { setLoading(false) } },[itemId])
+  const load = useCallback(async()=>{
+    try {
+      const d = await getAllanamiento(itemId)
+      setItem(d)
+      setEditForm({
+        numeroSolicitud: d?.numeroSolicitud || '',
+        direccion: d?.direccion || '',
+        sospechoso: d?.sospechoso || '',
+        unidad: d?.unidad || 'General',
+        motivacion: d?.motivacion || '',
+        descripcion: d?.descripcion || '',
+        observaciones: d?.observaciones || '',
+      })
+    } catch {}
+    finally { setLoading(false) }
+  },[itemId])
   useEffect(()=>{ load() },[load])
 
   // Smart scroll: only auto-scroll if user is pinned to bottom
@@ -240,6 +265,29 @@ ${item.firmas?.length===0?`
               {!yafirmo && item.estado!=='denegado' && <button onClick={()=>doAction('firmar',{tipoFirma:'supervisor'})} disabled={sending} className="btn-ghost py-1.5 px-3 text-[9px]"><PenTool size={11}/>Firmar</button>}
             </div>
           )}
+          {isCS && (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              <button
+                onClick={async()=>{
+                  if (!confirm('¿Eliminar esta solicitud de allanamiento? Esta acción no se puede deshacer.')) return
+                  setSending(true)
+                  try {
+                    await borrarAllanamiento(itemId)
+                    onAction('Solicitud eliminada')
+                    onClose()
+                  } catch (e:any) {
+                    alert(e.message)
+                  } finally {
+                    setSending(false)
+                  }
+                }}
+                disabled={sending}
+                className="btn-danger py-1.5 px-3 text-[9px]"
+              >
+                <Trash2 size={11}/>Eliminar solicitud
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -252,6 +300,59 @@ ${item.firmas?.length===0?`
         {/* INFO */}
         {tab==='info' && (
           <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
+            {isCS && (
+              <div className="bg-bg-surface border border-bg-border p-3 flex flex-col gap-2">
+                <p className="font-mono text-[8px] text-accent-blue uppercase tracking-widest">Editar solicitud (Command Staff)</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className="label">N° Solicitud</label>
+                    <input className="input text-xs py-2" value={editForm.numeroSolicitud} onChange={e=>setEditForm(p=>({...p, numeroSolicitud:e.target.value}))} />
+                  </div>
+                  <div>
+                    <label className="label">Unidad</label>
+                    <input className="input text-xs py-2" value={editForm.unidad} onChange={e=>setEditForm(p=>({...p, unidad:e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Dirección</label>
+                  <input className="input text-xs py-2" value={editForm.direccion} onChange={e=>setEditForm(p=>({...p, direccion:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="label">Sospechoso</label>
+                  <input className="input text-xs py-2" value={editForm.sospechoso} onChange={e=>setEditForm(p=>({...p, sospechoso:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="label">Motivación</label>
+                  <textarea className="input min-h-20 resize-none text-xs" value={editForm.motivacion} onChange={e=>setEditForm(p=>({...p, motivacion:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="label">Descripción</label>
+                  <textarea className="input min-h-16 resize-none text-xs" value={editForm.descripcion} onChange={e=>setEditForm(p=>({...p, descripcion:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="label">Observaciones</label>
+                  <textarea className="input min-h-16 resize-none text-xs" value={editForm.observaciones} onChange={e=>setEditForm(p=>({...p, observaciones:e.target.value}))} />
+                </div>
+                <button
+                  onClick={async()=>{
+                    setSending(true)
+                    try {
+                      await editarAllanamiento(itemId, { accion:'editar', ...editForm })
+                      await load()
+                      onAction('Solicitud actualizada')
+                    } catch (e:any) {
+                      alert(e.message)
+                    } finally {
+                      setSending(false)
+                    }
+                  }}
+                  disabled={sending}
+                  className="btn-primary w-fit py-2 px-3 text-[10px]"
+                >
+                  <Pencil size={12}/>Guardar cambios
+                </button>
+              </div>
+            )}
             {[['Sospechoso',item.sospechoso||'—'],['Unidad',item.unidad],['Solicitante',`${item.nombreSolicitante}${item.callsignSolicitante?` [${item.callsignSolicitante}]`:''}`]].map(([k,v])=>(
               <div key={k} className="bg-bg-surface border border-bg-border p-3">
                 <p className="font-mono text-[8px] text-tx-muted uppercase mb-0.5">{k}</p>
@@ -459,7 +560,29 @@ export default function AllanamientosPage() {
                   <td className="table-cell text-xs text-tx-secondary">{a.nombreSolicitante}{a.callsignSolicitante&&` [${a.callsignSolicitante}]`}</td>
                   <td className="table-cell font-mono text-[9px] text-tx-muted">{a.firmas?.length||0}</td>
                   <td className="table-cell font-mono text-[9px] text-tx-muted whitespace-nowrap">{new Date(a.fechaSolicitud).toLocaleDateString('es')}</td>
-                  <td className="table-cell text-tx-muted">›</td>
+                  <td className="table-cell text-tx-muted">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>›</span>
+                      {user?.rol === 'command_staff' && (
+                        <button
+                          className="text-red-400 hover:text-red-300"
+                          onClick={async (e)=>{
+                            e.stopPropagation()
+                            if (!confirm(`¿Eliminar ${a.numeroSolicitud}?`)) return
+                            try {
+                              await borrarAllanamiento(a.id)
+                              notify('Solicitud eliminada')
+                            } catch (err:any) {
+                              notify(err.message || 'No se pudo eliminar', false)
+                            }
+                          }}
+                          title="Eliminar solicitud"
+                        >
+                          <Trash2 size={12}/>
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
