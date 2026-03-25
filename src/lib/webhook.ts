@@ -356,9 +356,13 @@ export function generateAllanamientoPreviewSVG(input: {
   const solicitante = `${input.nombreSolicitante}${input.callsignSolicitante ? ` [${input.callsignSolicitante}]` : ''}`
   const solicitanteMeta = `N° ${input.numeroAgenteSolicitante || '—'}`
   const firmaText = input.includeFirma ? (input.firmaAutorizacion || 'Pendiente') : ''
+  const firmaDate = input.includeFirma ? new Date().toLocaleString('es') : ''
   const firmaMeta = input.includeFirma
     ? `${input.callsignAutorizador ? `[${input.callsignAutorizador}] ` : ''}N° ${input.numeroAgenteAutorizador || '—'}`
     : ''
+  const firmaStroke = input.includeFirma
+    ? 'M1060 926 C1130 886, 1200 965, 1268 930 S1380 886, 1475 924 S1584 960, 1662 918'
+    : 'M1060 930 C1140 930, 1220 930, 1300 930 S1460 930, 1540 930 S1620 930, 1660 930'
 
   const lines = [
     `Dirección: ${input.direccion}`,
@@ -391,13 +395,22 @@ export function generateAllanamientoPreviewSVG(input: {
   ${blocks}
 
   <rect x="150" y="820" width="780" height="170" fill="none" stroke="#c9a227"/>
-  <rect x="990" y="820" width="780" height="170" fill="none" stroke="#c9a227"/>
+  <rect x="990" y="820" width="780" height="170" fill="#fffaf0" stroke="#c9a227"/>
   <text x="180" y="870" fill="#a16207" font-size="18" letter-spacing="2" font-family="monospace">SOLICITANTE</text>
   <text x="180" y="930" fill="#0f172a" font-size="38" font-family="Arial, sans-serif">${escapeXml(solicitante)}</text>
   <text x="180" y="972" fill="#475569" font-size="24" font-family="Arial, sans-serif">${escapeXml(solicitanteMeta)}</text>
   <text x="1020" y="870" fill="#a16207" font-size="18" letter-spacing="2" font-family="monospace">AUTORIZACIÓN OFICIAL</text>
-  <text x="1020" y="930" fill="#0f172a" font-size="38" font-family="Arial, sans-serif">${escapeXml(firmaText)}</text>
-  <text x="1020" y="972" fill="#475569" font-size="24" font-family="Arial, sans-serif">${escapeXml(firmaMeta)}</text>
+
+  <path d="${firmaStroke}" fill="none" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="${input.includeFirma ? '0.85' : '0.3'}"/>
+  <text x="1060" y="918" fill="rgba(15,23,42,0.28)" font-size="19" letter-spacing="6" font-family="monospace">FIRMA DIGITAL</text>
+  <text x="1060" y="954" fill="#0f172a" font-size="40" font-family="cursive" transform="rotate(-2 1060 954)">${escapeXml(firmaText)}</text>
+  <text x="1060" y="982" fill="#475569" font-size="20" font-family="Arial, sans-serif">${escapeXml(firmaMeta)}</text>
+
+  <circle cx="1655" cy="892" r="62" fill="none" stroke="${input.includeFirma ? '#16a34a' : '#9ca3af'}" stroke-width="3" opacity="0.9"/>
+  <circle cx="1655" cy="892" r="48" fill="none" stroke="${input.includeFirma ? '#16a34a' : '#9ca3af'}" stroke-width="1.5" opacity="0.6"/>
+  <text x="1655" y="888" text-anchor="middle" fill="${input.includeFirma ? '#16a34a' : '#9ca3af'}" font-size="13" letter-spacing="2" font-family="monospace">VALIDADA</text>
+  <text x="1655" y="907" text-anchor="middle" fill="${input.includeFirma ? '#16a34a' : '#9ca3af'}" font-size="13" letter-spacing="2" font-family="monospace">FIB HQ</text>
+  <text x="1640" y="972" text-anchor="end" fill="#64748b" font-size="16" font-family="monospace">${escapeXml(firmaDate)}</text>
 
   <text x="960" y="760" text-anchor="middle" fill="rgba(34,197,94,0.12)" font-size="140" font-weight="700" letter-spacing="5" transform="rotate(-28, 960, 760)" font-family="Arial, sans-serif">${escapeXml(estado)}</text>
 </svg>`
@@ -421,14 +434,22 @@ export async function sendDiscordFileMessage(
   webhookUrl: string,
   pngBuffer: Buffer,
   filename: string,
-  message?: string
+  message?: string | { content?: string; embeds?: any[] }
 ): Promise<void> {
   try {
     const formData = new FormData()
     const blob = new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' })
     formData.append('file', blob, filename)
-    if (message) {
+
+    if (typeof message === 'string' && message.trim()) {
       formData.append('content', message)
+    } else if (message && typeof message === 'object') {
+      const payload: Record<string, unknown> = {}
+      if (message.content && message.content.trim()) payload.content = message.content
+      if (Array.isArray(message.embeds) && message.embeds.length > 0) payload.embeds = message.embeds
+      if (Object.keys(payload).length > 0) {
+        formData.append('payload_json', JSON.stringify(payload))
+      }
     }
 
     await fetch(webhookUrl, {
@@ -455,14 +476,24 @@ export async function logAllanamientoCreado(input: {
   try {
     const png = await renderSVGToPNG(input.svgPreview)
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-solicitud.png`
-    const message = [
-      '📋 **Nueva Solicitud de Allanamiento**',
-      `\`${input.numero}\` | ${input.direccion}`,
-      `Solicitante: ${input.solicitadoPor}`,
-      `Callsign: ${input.callsignSolicitante || '—'}`,
-      `N° Agente: ${input.numeroAgenteSolicitante || '—'}`,
-    ].join('\n')
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, message)
+    const embed = {
+      title: '📋 Nueva Solicitud de Allanamiento',
+      color: COLORS.yellow,
+      fields: [
+        { name: 'N° Solicitud', value: input.numero, inline: true },
+        { name: 'Solicitante', value: input.solicitadoPor, inline: true },
+        { name: 'Dirección', value: input.direccion.slice(0, 1024), inline: false },
+        { name: 'Callsign', value: input.callsignSolicitante || '—', inline: true },
+        { name: 'N° Agente', value: input.numeroAgenteSolicitante || '—', inline: true },
+      ],
+      image: { url: `attachment://${filename}` },
+      timestamp: new Date().toISOString(),
+      footer: { text: 'FIB HQ — Allanamientos' },
+    }
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
+      content: '📋 Se registró una nueva solicitud de allanamiento.',
+      embeds: [embed],
+    })
   } catch (error) {
     console.error('[webhook] Error logging allanamiento creado:', error)
   }
@@ -486,17 +517,28 @@ export async function logAllanamientoAutorizado(input: {
   try {
     const png = await renderSVGToPNG(input.svgPreview)
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
-    const message = [
-      '✅ **Allanamiento Autorizado**',
-      `\`${input.numero}\` | ${input.direccion}`,
-      `Solicitante: ${input.solicitadoPor}`,
-      `Callsign solicitante: ${input.callsignSolicitante || '—'}`,
-      `N° agente solicitante: ${input.numeroAgenteSolicitante || '—'}`,
-      `Autorizado por: ${input.autorizadoPor}`,
-      `Callsign autorizador: ${input.callsignAutorizador || '—'}`,
-      `N° agente autorizador: ${input.numeroAgenteAutorizador || '—'}`,
-    ].join('\n')
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, message)
+    const embed = {
+      title: '✅ Allanamiento Autorizado',
+      color: COLORS.green,
+      fields: [
+        { name: 'N° Solicitud', value: input.numero, inline: true },
+        { name: 'Autorizado por', value: input.autorizadoPor, inline: true },
+        { name: 'Dirección', value: input.direccion.slice(0, 1024), inline: false },
+        { name: 'Solicitante', value: input.solicitadoPor, inline: true },
+        { name: 'Callsign solicitante', value: input.callsignSolicitante || '—', inline: true },
+        { name: 'N° agente solicitante', value: input.numeroAgenteSolicitante || '—', inline: true },
+        { name: 'Callsign autorizador', value: input.callsignAutorizador || '—', inline: true },
+        { name: 'N° agente autorizador', value: input.numeroAgenteAutorizador || '—', inline: true },
+      ],
+      image: { url: `attachment://${filename}` },
+      timestamp: new Date().toISOString(),
+      footer: { text: 'FIB HQ — Documento autorizado' },
+    }
+
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
+      content: '✅ Documento autorizado y registrado en el canal de allanamientos.',
+      embeds: [embed],
+    })
   } catch (error) {
     console.error('[webhook] Error logging allanamiento autorizado:', error)
   }
