@@ -488,8 +488,16 @@ export async function logAllanamientoCreado(input: {
     }
 
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-solicitud.png`
+    
+    const messageContent = [
+      `**📋 Nueva Solicitud de Allanamiento**`,
+      `\`${input.numero}\` | ${input.direccion}`,
+      `**Solicitante:** ${input.solicitadoPor}`,
+      `**Callsign:** ${input.callsignSolicitante || '—'}`,
+      `**N° Agente:** ${input.numeroAgenteSolicitante || '—'}`,
+    ].join('\n')
+    
     const embed = {
-      title: '📋 Nueva Solicitud de Allanamiento',
       color: COLORS.yellow,
       fields: [
         { name: 'N° Solicitud', value: input.numero, inline: true },
@@ -498,11 +506,11 @@ export async function logAllanamientoCreado(input: {
         { name: 'Callsign', value: input.callsignSolicitante || '—', inline: true },
         { name: 'N° Agente', value: input.numeroAgenteSolicitante || '—', inline: true },
       ],
-      image: { url: `attachment://${filename}` },
       timestamp: new Date().toISOString(),
       footer: { text: 'FIB HQ — Allanamientos' },
     }
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
+      content: messageContent,
       embeds: [embed],
     })
   } catch (error) {
@@ -540,8 +548,20 @@ export async function logAllanamientoAutorizado(input: {
     }
 
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
+    
+    const messageContent = [
+      `**✅ Allanamiento Autorizado**`,
+      `\`${input.numero}\` | ${input.direccion}`,
+      `**Solicitante:** ${input.solicitadoPor}`,
+      `**Callsign solicitante:** ${input.callsignSolicitante || '—'}`,
+      `**N° agente solicitante:** ${input.numeroAgenteSolicitante || '—'}`,
+      ``,
+      `**Autorizado por:** ${input.autorizadoPor}`,
+      `**Callsign autorizador:** ${input.callsignAutorizador || '—'}`,
+      `**N° agente autorizador:** ${input.numeroAgenteAutorizador || '—'}`,
+    ].join('\n')
+    
     const embed = {
-      title: '✅ Allanamiento Autorizado',
       color: COLORS.green,
       fields: [
         { name: 'N° Solicitud', value: input.numero, inline: true },
@@ -553,12 +573,12 @@ export async function logAllanamientoAutorizado(input: {
         { name: 'Callsign autorizador', value: input.callsignAutorizador || '—', inline: true },
         { name: 'N° agente autorizador', value: input.numeroAgenteAutorizador || '—', inline: true },
       ],
-      image: { url: `attachment://${filename}` },
       timestamp: new Date().toISOString(),
       footer: { text: 'FIB HQ — Documento autorizado' },
     }
 
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
+      content: messageContent,
       embeds: [embed],
     })
   } catch (error) {
