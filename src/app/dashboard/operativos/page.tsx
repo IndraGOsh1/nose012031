@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Eye, Edit, Trash2, Check, ArchiveX, Clock, Image, Type, Minus, MoveUp, MoveDown } from 'lucide-react'
 import { getOperativos, crearOperativo, editarOperativo, borrarOperativo } from '@/lib/client'
+import { uiAlert, uiConfirm } from '@/lib/ui-dialog'
 
 type EstadoOp = 'borrador' | 'pendiente' | 'publicado' | 'archivado'
 type TipoOp   = 'operativo' | 'informe'
@@ -276,15 +277,15 @@ function ModalVer({ item, user, onClose, onAction }: { item:any; user:any; onClo
       await editarOperativo(item.id, { accion })
       const msgs: Record<string,string> = { aprobar:'Publicado', rechazar:'Devuelto a borrador', archivar:'Archivado', pendiente:'Enviado para aprobación' }
       onAction(msgs[accion]||'Actualizado'); onClose()
-    } catch(e:any) { alert(e.message) }
+    } catch(e:any) { uiAlert(e?.message || 'No se pudo completar la acción', 'Operativos') }
     finally { setLoading(false) }
   }
 
   async function eliminar() {
-    if (!window.confirm(`¿Eliminar "${item.titulo}"?`)) return
+    if (!await uiConfirm(`¿Eliminar "${item.titulo}"?`, { tone: 'danger', title: 'Eliminar operativo' })) return
     setLoading(true)
     try { await borrarOperativo(item.id); onAction('Eliminado'); onClose() }
-    catch(e:any) { alert(e.message) }
+    catch(e:any) { uiAlert(e?.message || 'No se pudo eliminar', 'Operativos') }
     finally { setLoading(false) }
   }
 

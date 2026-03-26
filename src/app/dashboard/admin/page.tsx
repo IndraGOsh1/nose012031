@@ -32,6 +32,7 @@ import {
   getConfigVisual,
   setConfigVisual,
 } from '@/lib/client'
+import { uiConfirm } from '@/lib/ui-dialog'
 import { FORM_BRANCHES, FORM_CLASSES } from '@/lib/forms-db'
 import { buildGoogleFormUrls } from '@/lib/google-forms'
 
@@ -295,7 +296,7 @@ export default function AdminPage() {
   }
 
   async function removeUser(id: string, username: string) {
-    if (!confirm(`¿Eliminar usuario ${username}? Esta acción no se puede deshacer.`)) return
+    if (!await uiConfirm(`¿Eliminar usuario ${username}? Esta acción no se puede deshacer.`, { tone: 'danger', title: 'Eliminar usuario' })) return
     try {
       await borrarUser(id)
       setToast({ msg: 'Usuario eliminado', ok: true })
@@ -404,7 +405,7 @@ export default function AdminPage() {
   }
 
   async function deleteFormById(id: string) {
-    if (!confirm('¿Eliminar formulario y respuestas asociadas?')) return
+    if (!await uiConfirm('¿Eliminar formulario y respuestas asociadas?', { tone: 'danger', title: 'Eliminar formulario' })) return
     try {
       await saveForm({ action: 'delete', id })
       setToast({ msg: 'Formulario eliminado', ok: true })
@@ -416,7 +417,7 @@ export default function AdminPage() {
 
   async function resetAllForms() {
     if (!isCS) return
-    if (!confirm('Se reiniciarán TODOS los formularios y respuestas. ¿Continuar?')) return
+    if (!await uiConfirm('Se reiniciarán TODOS los formularios y respuestas. ¿Continuar?', { tone: 'danger', title: 'Reset global' })) return
     try {
       await saveForm({ action: 'reset_all' })
       setToast({ msg: 'Reset completo de formularios aplicado', ok: true })
@@ -440,7 +441,7 @@ export default function AdminPage() {
   }
 
   async function removeResponse(formId: string, submissionId: string) {
-    if (!confirm('¿Quitar esta respuesta?')) return
+    if (!await uiConfirm('¿Quitar esta respuesta?', { tone: 'danger', title: 'Eliminar respuesta' })) return
     try {
       await deleteFormResponse(formId, submissionId)
       await loadResponses(formId)

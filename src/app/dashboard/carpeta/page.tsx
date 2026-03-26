@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, Trash2, FileText, StickyNote, Lock, X, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Search, User, MessageSquare } from 'lucide-react'
 import { getCarpeta, crearAnotacion, borrarCarpetaItem, getAgente, crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta } from '@/lib/client'
+import { uiConfirm } from '@/lib/ui-dialog'
 
 function formatThreadParticipants(participantes: string[] = []) {
   return participantes.join(', ')
@@ -403,7 +404,7 @@ export default function CarpetaPage() {
   }
 
   async function borrar(tipo: string, id: string) {
-    if (!confirm('¿Eliminar esta entrada?')) return
+    if (!await uiConfirm('¿Eliminar esta entrada?', { tone: 'danger', title: 'Eliminar entrada' })) return
     try {
       await borrarCarpetaItem(tipo, id)
       const c = await getCarpeta()

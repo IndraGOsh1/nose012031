@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Send, Hash, MessageSquare, Plus, User, Lock, Star, Crown, Image as ImageIcon, ChevronDown, Music, VolumeX, Volume2 } from 'lucide-react'
 import { getCanales, getMensajes, enviarMensaje, crearDM, crearChatPrivado } from '@/lib/client'
+import { uiAlert, uiPrompt } from '@/lib/ui-dialog'
 
 function timeLabel(iso: string) {
   const d = new Date(iso), now = new Date()
@@ -160,7 +161,7 @@ export default function ChatPage() {
       await loadCanales()
       setCanalActivo(r.id)
       setDmTarget(''); setShowDM(false)
-    } catch (e: any) { alert(e.message) }
+    } catch (e: any) { uiAlert(e?.message || 'No se pudo abrir el DM', 'Chat') }
   }
 
   async function crearSalaPrivada() {
@@ -180,7 +181,7 @@ export default function ChatPage() {
       setPrivateRoomDescription('')
       setShowDM(false)
     } catch (e: any) {
-      alert(e.message)
+      uiAlert(e?.message || 'No se pudo crear la sala privada', 'Chat')
     }
   }
 
@@ -453,7 +454,10 @@ export default function ChatPage() {
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 bg-bg-surface border border-bg-border focus-within:border-accent-blue transition-colors">
                 <button type="button"
-                  onClick={() => { const url = prompt('URL de imagen:'); if (url?.trim()) setTexto(url.trim()) }}
+                  onClick={async () => {
+                    const url = await uiPrompt('URL de imagen:', { title: 'Insertar imagen', placeholder: 'https://...' })
+                    if (url?.trim()) setTexto(url.trim())
+                  }}
                   className="px-2.5 py-2.5 text-tx-muted hover:text-accent-blue border-r border-bg-border transition-colors shrink-0">
                   <ImageIcon size={13} />
                 </button>

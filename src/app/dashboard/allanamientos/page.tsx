@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Send, FileText, Check, XCircle, PenTool, Trash2, Pencil } from 'lucide-react'
 import { getAllanamientos, crearAllanamiento, editarAllanamiento, getAllanamiento, borrarAllanamiento } from '@/lib/client'
+import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog'
 
 const ESTADO_TAG: Record<string,string> = {
   pendiente:  'tag border-yellow-700 bg-yellow-900/20 text-yellow-400',
@@ -124,13 +125,13 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId:string;
   async function doAction(accion:string,extra?:any) {
     setSending(true)
     try { await editarAllanamiento(itemId,{accion,motivo,...extra}); await load(); onAction(`Acción: ${accion}`) }
-    catch(e:any) { alert(e.message) } finally { setSending(false) }
+    catch(e:any) { uiAlert(e?.message || 'No se pudo ejecutar la acción', 'Allanamientos') } finally { setSending(false) }
   }
 
   async function enviarMensaje(e:React.FormEvent) {
     e.preventDefault(); if (!mensaje.trim()) return; setSending(true)
     try { await editarAllanamiento(itemId,{mensaje:mensaje.trim()}); setMensaje(''); await load() }
-    catch(e:any) { alert(e.message) } finally { setSending(false) }
+    catch(e:any) { uiAlert(e?.message || 'No se pudo enviar el mensaje', 'Allanamientos') } finally { setSending(false) }
   }
 
   async function enviarReporteHallazgo(e: React.FormEvent) {
@@ -150,7 +151,7 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId:string;
       await load()
       onAction('Informe de hallazgo registrado')
     } catch (e: any) {
-      alert(e.message)
+      uiAlert(e?.message || 'No se pudo registrar el informe', 'Allanamientos')
     } finally {
       setSending(false)
     }
@@ -259,7 +260,14 @@ ${item.firmas?.length===0?`
             <div className="flex gap-2 mt-2 flex-wrap">
               {item.estado==='pendiente' && <>
                 <button onClick={()=>doAction('autorizar')} disabled={sending} className="btn-success py-1.5 px-3 text-[9px]"><Check size={11}/>Autorizar</button>
-                <button onClick={()=>{ const m=prompt('Motivo de denegación:'); if(m) doAction('denegar',{motivo:m}) }} disabled={sending} className="btn-danger py-1.5 px-3 text-[9px]"><XCircle size={11}/>Denegar</button>
+                <button
+                  onClick={async()=>{
+                    const m = await uiPrompt('Motivo de denegación:', { title: 'Denegar solicitud', placeholder: 'Escribe el motivo...' })
+                    if (m) doAction('denegar',{motivo:m})
+                  }}
+                  disabled={sending}
+                  className="btn-danger py-1.5 px-3 text-[9px]"
+                ><XCircle size={11}/>Denegar</button>
               </>}
               {item.estado==='autorizado' && <button onClick={()=>doAction('ejecutar')} disabled={sending} className="btn-primary py-1.5 px-3 text-[9px]">✅ Ejecutado</button>}
               {!yafirmo && item.estado!=='denegado' && <button onClick={()=>doAction('firmar',{tipoFirma:'supervisor'})} disabled={sending} className="btn-ghost py-1.5 px-3 text-[9px]"><PenTool size={11}/>Firmar</button>}
@@ -269,14 +277,14 @@ ${item.firmas?.length===0?`
             <div className="flex gap-2 mt-2 flex-wrap">
               <button
                 onClick={async()=>{
-                  if (!confirm('¿Eliminar esta solicitud de allanamiento? Esta acción no se puede deshacer.')) return
+                  if (!await uiConfirm('¿Eliminar esta solicitud de allanamiento? Esta acción no se puede deshacer.', { tone: 'danger', title: 'Eliminar solicitud' })) return
                   setSending(true)
                   try {
                     await borrarAllanamiento(itemId)
                     onAction('Solicitud eliminada')
                     onClose()
                   } catch (e:any) {
-                    alert(e.message)
+                    uiAlert(e?.message || 'No se pudo eliminar la solicitud', 'Allanamientos')
                   } finally {
                     setSending(false)
                   }
@@ -341,7 +349,7 @@ ${item.firmas?.length===0?`
                       await load()
                       onAction('Solicitud actualizada')
                     } catch (e:any) {
-                      alert(e.message)
+                      uiAlert(e?.message || 'No se pudo actualizar la solicitud', 'Allanamientos')
                     } finally {
                       setSending(false)
                     }
@@ -568,7 +576,7 @@ export default function AllanamientosPage() {
                           className="text-red-400 hover:text-red-300"
                           onClick={async (e)=>{
                             e.stopPropagation()
-                            if (!confirm(`¿Eliminar ${a.numeroSolicitud}?`)) return
+                            if (!await uiConfirm(`¿Eliminar ${a.numeroSolicitud}?`, { tone: 'danger', title: 'Eliminar solicitud' })) return
                             try {
                               await borrarAllanamiento(a.id)
                               notify('Solicitud eliminada')

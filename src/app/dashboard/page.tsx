@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Users, FolderOpen, FileSearch, Ticket, TrendingUp, Shield, ChevronRight, ClipboardList, Plus, Trash2 } from 'lucide-react'
 import { getStats, getForms, saveForm, submitForm, getFormResponses } from '@/lib/client'
+import { uiConfirm } from '@/lib/ui-dialog'
 
 type FieldType = 'text' | 'textarea' | 'number' | 'date'
 
@@ -115,7 +116,7 @@ export default function DashboardHome() {
 
   async function deleteForm(id: string) {
     if (!formsData.canManage) return
-    if (!confirm('¿Eliminar formulario?')) return
+    if (!await uiConfirm('¿Eliminar formulario?', { tone: 'danger', title: 'Eliminar formulario' })) return
     setFormsBusy(true)
     try {
       await saveForm({ action: 'delete', id })

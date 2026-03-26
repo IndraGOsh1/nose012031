@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Save, RefreshCw, CheckCircle, AlertCircle, RotateCcw, Palette, Image, Type, Bell, Key, Globe } from 'lucide-react'
 import { getConfigVisual, setConfigVisual, resetConfigVisual, getInvites, crearInvite, borrarInvite } from '@/lib/client'
 import { buildGoogleFormUrls } from '@/lib/google-forms'
+import { uiConfirm } from '@/lib/ui-dialog'
 
 type Tab = 'identidad'|'colores'|'fondos'|'banner'|'website'|'invitaciones'
 
@@ -61,7 +62,7 @@ export default function ConfigPage() {
   }
 
   async function restablecer() {
-    if (!confirm('¿Restablecer configuración?')) return
+    if (!await uiConfirm('¿Restablecer configuración?', { tone: 'danger', title: 'Restablecer' })) return
     try { await resetConfigVisual(); const c=await getConfigVisual(); setConfigS(c); setToast({msg:'✅ Restablecido',ok:true}) } catch {}
   }
 

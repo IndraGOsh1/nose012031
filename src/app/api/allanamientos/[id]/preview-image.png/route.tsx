@@ -27,6 +27,15 @@ function buildInfoLines(item: any) {
   ].filter(Boolean)
 }
 
+function parseNumeroSolicitud(raw: string) {
+  const value = String(raw || '').trim()
+  const parts = value.split('//').map((p) => p.trim())
+  return {
+    principal: parts[0] || value,
+    detalle: parts[1] || '',
+  }
+}
+
 export async function GET(_req: Request, { params }: P) {
   const { id } = await params
   const db = await getAllanamientosDB()
@@ -62,6 +71,7 @@ export async function GET(_req: Request, { params }: P) {
   const firmanteCallsign = item.firmas?.[0]?.callsign || '—'
   const firmaFecha = item.firmas?.[0]?.fecha ? new Date(item.firmas[0].fecha).toLocaleString('es') : 'Sin firma registrada'
   const lines = buildInfoLines(item)
+  const numeroSolicitud = parseNumeroSolicitud(item.numeroSolicitud)
 
   return new ImageResponse(
     (
@@ -81,16 +91,19 @@ export async function GET(_req: Request, { params }: P) {
         <div style={{ position: 'absolute', top: 110, left: 120, right: 120, height: 10, background: '#111827' }} />
         <div style={{ position: 'absolute', top: 121, left: 120, right: 120, height: 5, background: '#c9a227' }} />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 52 }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 52, gap: 40 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
             <span style={{ color: '#a16207', fontSize: 28, letterSpacing: 3, fontFamily: 'monospace' }}>Federal Investigation Bureau - HQ</span>
             <span style={{ color: '#111827', fontSize: 86, fontWeight: 700, letterSpacing: 2, marginTop: 22 }}>SOLICITUD DE ALLANAMIENTO</span>
             <span style={{ color: '#334155', fontSize: 24, letterSpacing: 6, fontFamily: 'monospace', marginTop: 8 }}>REPORTE OPERATIVO CLASIFICADO</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', width: 560, flexShrink: 0 }}>
             <span style={{ color: '#475569', fontSize: 20, letterSpacing: 2, fontFamily: 'monospace' }}>N° SOLICITUD</span>
-            <span style={{ color: '#0f172a', fontSize: 74, fontWeight: 700, marginTop: 18 }}>{item.numeroSolicitud}</span>
+            <span style={{ color: '#0f172a', fontSize: 48, fontWeight: 700, marginTop: 18, maxWidth: '100%', textAlign: 'right' }}>{numeroSolicitud.principal}</span>
+            {!!numeroSolicitud.detalle && (
+              <span style={{ color: '#475569', fontSize: 21, fontFamily: 'monospace', marginTop: 4, maxWidth: '100%', textAlign: 'right' }}>{numeroSolicitud.detalle}</span>
+            )}
             <span style={{ color: '#475569', fontSize: 24, fontFamily: 'monospace', marginTop: 8 }}>{fecha}</span>
             <span style={{ color: estadoColor, fontSize: 26, fontFamily: 'monospace', marginTop: 12 }}>{estado}</span>
           </div>

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, FolderOpen, FileSearch, Ticket, MessageSquare, FolderArchive, Shield, Settings, LogOut, Menu, X, Bell, MapPin, Activity } from 'lucide-react'
 import { useTheme } from '@/lib/theme-context'
 import { readJsonSafely } from '@/lib/client'
+import { uiDialogEvents, type UiConfirmOptions } from '@/lib/ui-dialog'
 
 function isTokenExpired(token: string): boolean {
   try {
@@ -98,6 +99,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [clock, setClock] = useState('--:--:--')
   const [latency, setLatency] = useState(() => getInitialLatency())
   const [contentReady, setContentReady] = useState(false)
+  const [uiAlert, setUiAlert] = useState<{ title?: string; message: string } | null>(null)
+  const [uiConfirm, setUiConfirm] = useState<{ message: string; options?: UiConfirmOptions; resolve: (accepted: boolean) => void } | null>(null)
+  const [uiPrompt, setUiPrompt] = useState<{ message: string; value: string; options?: { title?: string; confirmText?: string; cancelText?: string; placeholder?: string; tone?: 'danger' | 'neutral' }; resolve: (value: string | null) => void } | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const { theme } = useTheme()
@@ -222,6 +226,63 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       cancelAnimationFrame(enterFrame)
     }
   }, [])
+
+  useEffect(() => {
+    const onAlert = (event: Event) => {
+      const detail = (event as CustomEvent<{ message: string; title?: string }>).detail
+      if (!detail?.message) return
+      setUiAlert({ title: detail.title, message: detail.message })
+      window.setTimeout(() => setUiAlert((current) => (current?.message === detail.message ? null : current)), 3800)
+    }
+
+    const onConfirm = (event: Event) => {
+      const detail = (event as CustomEvent<{ message: string; options?: UiConfirmOptions; resolve: (accepted: boolean) => void }>).detail
+      if (!detail?.message || typeof detail.resolve !== 'function') return
+      setUiConfirm({ message: detail.message, options: detail.options, resolve: detail.resolve })
+    }
+
+    const onPrompt = (event: Event) => {
+      const detail = (event as CustomEvent<{ message: string; options?: { title?: string; confirmText?: string; cancelText?: string; placeholder?: string; defaultValue?: string; tone?: 'danger' | 'neutral' }; resolve: (value: string | null) => void }>).detail
+      if (!detail?.message || typeof detail.resolve !== 'function') return
+      setUiPrompt({
+        message: detail.message,
+        value: detail.options?.defaultValue || '',
+        options: detail.options,
+        resolve: detail.resolve,
+      })
+    }
+
+    window.addEventListener(uiDialogEvents.ALERT_EVENT, onAlert)
+    window.addEventListener(uiDialogEvents.CONFIRM_EVENT, onConfirm)
+    window.addEventListener(uiDialogEvents.PROMPT_EVENT, onPrompt)
+    return () => {
+      window.removeEventListener(uiDialogEvents.ALERT_EVENT, onAlert)
+      window.removeEventListener(uiDialogEvents.CONFIRM_EVENT, onConfirm)
+      window.removeEventListener(uiDialogEvents.PROMPT_EVENT, onPrompt)
+      setUiConfirm((current) => {
+        if (current) current.resolve(false)
+        return null
+      })
+      setUiPrompt((current) => {
+        if (current) current.resolve(null)
+        return null
+      })
+    }
+  }, [])
+
+  const closeConfirm = (accepted: boolean) => {
+    setUiConfirm((current) => {
+      if (current) current.resolve(accepted)
+      return null
+    })
+  }
+
+  const closePrompt = (value: string | null) => {
+    setUiPrompt((current) => {
+      if (current) current.resolve(value)
+      return null
+    })
+  }
 
   const logout = async () => {
     localStorage.removeItem('fib_token')
@@ -414,6 +475,50 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </div>
+
+      {uiAlert && (
+        <div className="fixed bottom-5 right-5 z-[120] flex items-start gap-2 border border-accent-blue/40 bg-bg-card px-4 py-3 shadow-xl max-w-sm">
+          <div className="mt-0.5 h-2 w-2 rounded-full bg-accent-blue" />
+          <div className="min-w-0">
+            {uiAlert.title && <p className="font-mono text-[9px] tracking-widest uppercase text-accent-blue mb-0.5">{uiAlert.title}</p>}
+            <p className="text-xs text-tx-primary leading-relaxed break-words">{uiAlert.message}</p>
+          </div>
+          <button onClick={() => setUiAlert(null)} className="text-tx-muted hover:text-tx-primary"><X size={13} /></button>
+        </div>
+      )}
+
+      {uiConfirm && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/65 px-4">
+          <div className="w-full max-w-md border border-bg-border bg-bg-card p-5">
+            <p className="font-mono text-[9px] tracking-widest uppercase text-accent-blue mb-2">{uiConfirm.options?.title || 'Confirmación'}</p>
+            <p className="text-sm text-tx-primary leading-relaxed">{uiConfirm.message}</p>
+            <div className="mt-4 flex gap-2 justify-end">
+              <button className="btn-ghost py-2 px-3 text-[10px]" onClick={() => closeConfirm(false)}>{uiConfirm.options?.cancelText || 'Cancelar'}</button>
+              <button className={uiConfirm.options?.tone === 'danger' ? 'btn-danger py-2 px-3 text-[10px]' : 'btn-primary py-2 px-3 text-[10px]'} onClick={() => closeConfirm(true)}>{uiConfirm.options?.confirmText || 'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uiPrompt && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/65 px-4">
+          <div className="w-full max-w-md border border-bg-border bg-bg-card p-5">
+            <p className="font-mono text-[9px] tracking-widest uppercase text-accent-blue mb-2">{uiPrompt.options?.title || 'Ingresar dato'}</p>
+            <p className="text-sm text-tx-primary leading-relaxed mb-3">{uiPrompt.message}</p>
+            <input
+              className="input w-full text-xs py-2"
+              placeholder={uiPrompt.options?.placeholder || ''}
+              value={uiPrompt.value}
+              onChange={(e) => setUiPrompt((current) => current ? { ...current, value: e.target.value } : current)}
+              autoFocus
+            />
+            <div className="mt-4 flex gap-2 justify-end">
+              <button className="btn-ghost py-2 px-3 text-[10px]" onClick={() => closePrompt(null)}>{uiPrompt.options?.cancelText || 'Cancelar'}</button>
+              <button className={uiPrompt.options?.tone === 'danger' ? 'btn-danger py-2 px-3 text-[10px]' : 'btn-primary py-2 px-3 text-[10px]'} onClick={() => closePrompt(uiPrompt.value.trim())}>{uiPrompt.options?.confirmText || 'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
