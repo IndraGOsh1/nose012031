@@ -88,7 +88,21 @@ export const AllanamientosDB = new Proxy({} as Map<string, Allanamiento>, {
   }
 })
 
-let counter = 1
-export function nextAllNumber() {
-  return 'ALL-' + new Date().getFullYear() + '-' + String(counter++).padStart(3,'0')
+export async function nextAllNumber(solicitanteCallsign: string) {
+  try {
+    const db = await getAllanamientosDB()
+    const allCases = Array.from(db.values())
+    const totalCount = allCases.length + 1
+    const callsign = String(solicitanteCallsign || 'UNKNOWN').trim().slice(0, 20).toUpperCase()
+    return `${callsign}-PENDING // Numero de solicitud: ${String(totalCount).padStart(2, '0')}`
+  } catch {
+    return `${String(solicitanteCallsign || 'UNKNOWN').trim().slice(0, 20).toUpperCase()}-PENDING // Numero de solicitud: 01`
+  }
+}
+
+export function updateAllanamientoWithAuthorization(numeroSolicitud: string, autorizadorCallsign: string) {
+  if (!numeroSolicitud.includes('PENDING')) return numeroSolicitud
+  const [callsignPart, resto] = numeroSolicitud.split('-PENDING //')
+  const autCallsign = String(autorizadorCallsign || 'UNKNOWN').trim().slice(0, 20).toUpperCase()
+  return `${callsignPart}-${autCallsign} //${resto}`
 }

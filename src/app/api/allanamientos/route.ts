@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     // Fallback to local profile metadata when sheets is unavailable.
   }
   const now = new Date().toISOString()
-  const numeroSolicitud = nextAllNumber()
+  const numeroSolicitud = await nextAllNumber(solicitanteCallsign || u.username)
   const all: Allanamiento = {
     id: 'all-' + uuid().slice(0,8),
     numeroSolicitud,

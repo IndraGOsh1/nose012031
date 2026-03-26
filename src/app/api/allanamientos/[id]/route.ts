@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
-import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, type Firma } from '@/lib/allanamientos-db'
+import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, updateAllanamientoWithAuthorization, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
 import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado } from '@/lib/webhook'
 import { getRows, findAgent, COL } from '@/lib/sheets'
@@ -138,6 +138,9 @@ export async function PATCH(req: NextRequest, { params }:P) {
     } catch {
       // Fallback to local profile metadata when sheets is unavailable.
     }
+    // Update numero with both callsigns
+    next.numeroSolicitud = updateAllanamientoWithAuthorization(next.numeroSolicitud, autorizadorCallsign || u.username)
+    
     const previewUrl = buildPreviewUrl(req, next.id)
     afterPersist.push(() => logAllanamiento('Autorizado', next.numeroSolicitud, u.username))
 

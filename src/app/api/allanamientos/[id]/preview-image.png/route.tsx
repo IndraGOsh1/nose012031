@@ -5,35 +5,6 @@ export const runtime = 'nodejs'
 
 type P = { params: Promise<{ id: string }> }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __fibPreviewFontRegular: Promise<ArrayBuffer | null> | undefined
-  // eslint-disable-next-line no-var
-  var __fibPreviewFontBold: Promise<ArrayBuffer | null> | undefined
-}
-
-function loadFont(url: string, slot: 'regular' | 'bold') {
-  const key = slot === 'regular' ? '__fibPreviewFontRegular' : '__fibPreviewFontBold'
-  if (!global[key]) {
-    global[key] = fetch(url)
-      .then((r) => (r.ok ? r.arrayBuffer() : null))
-      .catch(() => null)
-  }
-  return global[key]!
-}
-
-async function getPreviewFonts() {
-  const [regular, bold] = await Promise.all([
-    loadFont('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf', 'regular'),
-    loadFont('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf', 'bold'),
-  ])
-
-  const fonts: Array<{ name: string; data: ArrayBuffer; weight?: number; style?: 'normal' | 'italic' }> = []
-  if (regular) fonts.push({ name: 'Noto Sans', data: regular, weight: 400, style: 'normal' })
-  if (bold) fonts.push({ name: 'Noto Sans', data: bold, weight: 700, style: 'normal' })
-  return fonts
-}
-
 function statusLabel(raw: string) {
   if (raw === 'autorizado') return 'AUTORIZADO'
   if (raw === 'denegado') return 'DENEGADO'
@@ -57,7 +28,6 @@ function buildInfoLines(item: any) {
 }
 
 export async function GET(_req: Request, { params }: P) {
-  const fonts = await getPreviewFonts()
   const { id } = await params
   const db = await getAllanamientosDB()
   const item = db.get(id)
@@ -80,7 +50,7 @@ export async function GET(_req: Request, { params }: P) {
           No encontrado
         </div>
       ),
-      { width: 1920, height: 1080, fonts }
+      { width: 1920, height: 1080 }
     )
   }
 
@@ -104,7 +74,7 @@ export async function GET(_req: Request, { params }: P) {
           background: '#f5f0e8',
           color: '#0f172a',
           padding: '110px 120px 90px',
-          fontFamily: 'Noto Sans, Arial, sans-serif',
+          fontFamily: '"Segoe UI", Trebuchet MS, Arial, sans-serif',
           flexDirection: 'column',
         }}
       >
@@ -180,6 +150,6 @@ export async function GET(_req: Request, { params }: P) {
         </div>
       </div>
     ),
-    { width: 1920, height: 1080, fonts }
+    { width: 1920, height: 1080 }
   )
 }
