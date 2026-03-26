@@ -144,7 +144,12 @@ export async function PATCH(req: NextRequest, { params }:P) {
 
     // Reuse the same preview endpoint rendered in UI to keep Discord and app in sync.
     afterPersist.push(async () => {
-      const pngBuffer = await renderAllanamientoPNG(next)
+      let pngBuffer: Buffer | undefined
+      try {
+        pngBuffer = await renderAllanamientoPNG(next)
+      } catch (pngError) {
+        console.error('[PATCH autorizar] Failed to render PNG for webhook:', pngError)
+      }
       let pdfBuffer: Buffer | undefined
       try {
         pdfBuffer = await renderAllanamientoPDF(next)
@@ -215,7 +220,12 @@ export async function PATCH(req: NextRequest, { params }:P) {
     }
 
     afterPersist.push(async () => {
-      const pngBuffer = await renderAllanamientoPNG(next)
+      let pngBuffer: Buffer | undefined
+      try {
+        pngBuffer = await renderAllanamientoPNG(next)
+      } catch (pngError) {
+        console.error('[PATCH ejecutar] Failed to render PNG for webhook:', pngError)
+      }
       return logAllanamientoEjecutado({
         numero: next.numeroSolicitud,
         ejecutadoPor: u.nombre || u.username,

@@ -99,8 +99,8 @@ export async function renderAllanamientoPNG(item: any): Promise<Buffer> {
         >
           <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14, display: 'flex', flexDirection: 'column' }}>
             <span style={{ color: '#64748b', fontSize: 11, letterSpacing: 5, fontFamily: 'monospace' }}>OBJETIVO</span>
-            <div style={{ marginTop: 8, fontSize: 36, lineHeight: 1.18, color: '#0f172a', fontFamily: 'Georgia, serif' }}>Direccion: {String(item.direccion || '—').slice(0, 120)}</div>
-            <div style={{ marginTop: 4, fontSize: 36, lineHeight: 1.18, color: '#0f172a', fontFamily: 'Georgia, serif' }}>Sospechoso(s): {String(item.sospechoso || 'Sin identificar').slice(0, 120)}</div>
+            <div style={{ marginTop: 8, fontSize: 36, lineHeight: 1.18, color: '#0f172a', fontFamily: 'Georgia, serif', display: 'flex' }}>Direccion: {String(item.direccion || '—').slice(0, 120)}</div>
+            <div style={{ marginTop: 4, fontSize: 36, lineHeight: 1.18, color: '#0f172a', fontFamily: 'Georgia, serif', display: 'flex' }}>Sospechoso(s): {String(item.sospechoso || 'Sin identificar').slice(0, 120)}</div>
           </div>
 
           <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14, display: 'flex', flexDirection: 'column' }}>
@@ -143,7 +143,7 @@ export async function renderAllanamientoPNG(item: any): Promise<Buffer> {
           {estado}
         </div>
 
-        <div style={{ position: 'absolute', left: 84, bottom: 24, fontSize: 13, color: '#9ca3af', letterSpacing: 2, fontFamily: 'monospace' }}>
+        <div style={{ position: 'absolute', left: 84, bottom: 24, fontSize: 13, color: '#9ca3af', letterSpacing: 2, fontFamily: 'monospace', display: 'flex' }}>
           SOLICITANTE: {solicitante}
         </div>
       </div>

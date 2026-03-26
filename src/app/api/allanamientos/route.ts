@@ -76,8 +76,15 @@ export async function POST(req: NextRequest) {
   }
   logAllanamiento('Creada', all.numeroSolicitud, u.username, direccion)
 
-  renderAllanamientoPNG(all).then(pngBuffer => {
-    return logAllanamientoCreado({
+  ;(async () => {
+    let pngBuffer: Buffer | undefined
+    try {
+      pngBuffer = await renderAllanamientoPNG(all)
+    } catch (error) {
+      console.error('[POST allanamientos] Error rendering PNG:', error)
+    }
+
+    await logAllanamientoCreado({
       numero: all.numeroSolicitud,
       direccion: all.direccion,
       sospechoso: all.sospechoso,
@@ -86,8 +93,8 @@ export async function POST(req: NextRequest) {
       callsignSolicitante: all.callsignSolicitante,
       numeroAgenteSolicitante: solicitanteNumero,
       pngBuffer,
-    })
-  }).catch(err => console.error('[POST allanamientos]', err))
+    }).catch(err => console.error('[POST allanamientos webhook]', err))
+  })()
   
   return NextResponse.json({ mensaje:'✅ Solicitud enviada', id:all.id, numero:all.numeroSolicitud }, { status:201 })
 }

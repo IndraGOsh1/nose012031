@@ -537,11 +537,12 @@ export async function logAllanamientoCreado(input: {
   solicitadoPor: string
   callsignSolicitante?: string | null
   numeroAgenteSolicitante?: string | null
-  pngBuffer: Buffer
+  pngBuffer?: Buffer
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
+    if (!input.pngBuffer) throw new Error('Missing PNG buffer for allanamiento creado')
     const discordImage = await prepareDiscordImage(input.pngBuffer)
     const filename = `allanamiento-${input.numero.replace(/[^a-zA-Z0-9-]/g, '-')}-solicitud.png`
 
@@ -576,12 +577,13 @@ export async function logAllanamientoAutorizado(input: {
   autorizadoPor: string
   callsignAutorizador?: string | null
   numeroAgenteAutorizador?: string | null
-  pngBuffer: Buffer
+  pngBuffer?: Buffer
   pdfBuffer?: Buffer
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
+    if (!input.pngBuffer) throw new Error('Missing PNG buffer for allanamiento autorizado')
     const discordImage = await prepareDiscordImage(input.pngBuffer)
     const safeBase = input.numero.replace(/[^a-zA-Z0-9-]/g, '-')
     const filename = `allanamiento-${safeBase}-autorizado.png`
@@ -629,11 +631,12 @@ export async function logAllanamientoEjecutado(input: {
   ejecutadoPor: string
   callsignEjecutor?: string | null
   numeroAgenteEjecutor?: string | null
-  pngBuffer: Buffer
+  pngBuffer?: Buffer
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
+    if (!input.pngBuffer) throw new Error('Missing PNG buffer for allanamiento ejecutado')
     const discordImage = await prepareDiscordImage(input.pngBuffer)
     const safeBase = input.numero.replace(/[^a-zA-Z0-9-]/g, '-')
     const filename = `allanamiento-${safeBase}-ejecutado.png`
