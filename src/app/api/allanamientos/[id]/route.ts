@@ -4,6 +4,7 @@ import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen }
 import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, updateAllanamientoWithAuthorization, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
 import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado } from '@/lib/webhook'
+import { renderAllanamientoPNG } from '@/lib/allanamientos-preview'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
 
@@ -140,23 +141,18 @@ export async function PATCH(req: NextRequest, { params }:P) {
     }
     // Update numero with both callsigns
     next.numeroSolicitud = updateAllanamientoWithAuthorization(next.numeroSolicitud, autorizadorCallsign || u.username)
-    
-    const previewUrl = buildPreviewUrl(req, next.id)
 
     // Reuse the same preview endpoint rendered in UI to keep Discord and app in sync.
-    afterPersist.push(() => logAllanamientoAutorizado({
-      numero: next.numeroSolicitud,
-      direccion: next.direccion,
-      sospechoso: next.sospechoso,
-      descripcion: next.descripcion,
-      solicitadoPor: next.nombreSolicitante,
-      callsignSolicitante: solicitanteCallsign,
-      numeroAgenteSolicitante: solicitanteNumero,
-      autorizadoPor: u.nombre || u.username,
-      callsignAutorizador: autorizadorCallsign,
-      numeroAgenteAutorizador: autorizadorNumero,
-      previewUrl,
-    }).catch(err => console.error('[PATCH autorizar]', err)))
+    afterPersist.push(async () => {
+      const pngBuffer = await renderAllanamientoPNG(next)
+      return logAllanamientoAutorizado({
+        numero: next.numeroSolicitud,
+        autorizadoPor: u.nombre || u.username,
+        callsignAutorizador: autorizadorCallsign,
+        numeroAgenteAutorizador: autorizadorNumero,
+        pngBuffer,
+      }).catch(err => console.error('[PATCH autorizar]', err))
+    })
   }
 
   if (accion === 'denegar' && isSuperv) {

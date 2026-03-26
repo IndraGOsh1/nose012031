@@ -469,44 +469,24 @@ export async function logAllanamientoCreado(input: {
   solicitadoPor: string
   callsignSolicitante?: string | null
   numeroAgenteSolicitante?: string | null
-  svgPreview?: string
-  previewUrl?: string
+  pngBuffer: Buffer
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
-    let png: Buffer
-    if (input.previewUrl) {
-      const res = await fetch(input.previewUrl)
-      if (!res.ok) throw new Error(`Preview URL failed with ${res.status}`)
-      const bytes = await res.arrayBuffer()
-      png = Buffer.from(bytes)
-    } else if (input.svgPreview) {
-      png = await renderSVGToPNG(input.svgPreview)
-    } else {
-      throw new Error('Missing preview image source')
-    }
+    const filename = `allanamiento-${input.numero.replace(/[^a-zA-Z0-9-]/g, '-')}-solicitud.png`
 
-    const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-solicitud.png`
-    
-    const messageContent = '📋 Nueva Solicitud de Allanamiento'
-    
-    const embed = {
-      color: COLORS.yellow,
-      fields: [
-        { name: 'N° Solicitud', value: input.numero, inline: true },
-        { name: 'Solicitante', value: input.solicitadoPor, inline: true },
-        { name: 'Dirección', value: input.direccion.slice(0, 1024), inline: false },
-        { name: 'Callsign', value: input.callsignSolicitante || '—', inline: true },
-        { name: 'N° Agente', value: input.numeroAgenteSolicitante || '—', inline: true },
-      ],
-      timestamp: new Date().toISOString(),
-      footer: { text: 'FIB HQ — Allanamientos' },
-    }
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
-      content: messageContent,
-      embeds: [embed],
-    })
+    const callsign = input.callsignSolicitante || input.solicitadoPor
+    const agente = input.numeroAgenteSolicitante || '—'
+    const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
+    const numSolicitud = numMatch ? numMatch[1] : input.numero
+
+    const messageText = [
+      '📋 **Nueva Solicitud de Allanamiento**',
+      `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
+    ].join('\n')
+
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, input.pngBuffer, filename, messageText)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento creado:', error)
   }
@@ -514,36 +494,16 @@ export async function logAllanamientoCreado(input: {
 
 export async function logAllanamientoAutorizado(input: {
   numero: string
-  direccion: string
-  sospechoso: string
-  descripcion: string
-  solicitadoPor: string
-  callsignSolicitante?: string | null
-  numeroAgenteSolicitante?: string | null
   autorizadoPor: string
   callsignAutorizador?: string | null
   numeroAgenteAutorizador?: string | null
-  svgPreview?: string
-  previewUrl?: string
+  pngBuffer: Buffer
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
-    let png: Buffer
-    if (input.previewUrl) {
-      const res = await fetch(input.previewUrl)
-      if (!res.ok) throw new Error(`Preview URL failed with ${res.status}`)
-      const bytes = await res.arrayBuffer()
-      png = Buffer.from(bytes)
-    } else if (input.svgPreview) {
-      png = await renderSVGToPNG(input.svgPreview)
-    } else {
-      throw new Error('Missing preview image source')
-    }
+    const filename = `allanamiento-${input.numero.replace(/[^a-zA-Z0-9-]/g, '-')}-autorizado.png`
 
-    const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
-
-    // Extract just the sequence number from "CALLSIGN-CALLSIGN // Numero de solicitud: ##"
     const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
     const numSolicitud = numMatch ? numMatch[1] : input.numero
 
@@ -555,7 +515,7 @@ export async function logAllanamientoAutorizado(input: {
       `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
     ].join('\n')
 
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, messageText)
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, input.pngBuffer, filename, messageText)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento autorizado:', error)
   }
