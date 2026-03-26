@@ -436,6 +436,18 @@ export async function renderSVGToPNG(svgString: string, width: number = 1920, he
   }
 }
 
+async function prepareDiscordImage(pngBuffer: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(pngBuffer)
+      .resize({ width: 1600, withoutEnlargement: true, fit: 'inside' })
+      .sharpen({ sigma: 1.2 })
+      .png({ compressionLevel: 6, adaptiveFiltering: true })
+      .toBuffer()
+  } catch {
+    return pngBuffer
+  }
+}
+
 export async function sendDiscordFileMessage(
   webhookUrl: string,
   fileBuffer: Buffer,
@@ -443,11 +455,34 @@ export async function sendDiscordFileMessage(
   contentType: string = 'image/png',
   message?: string | { content?: string; embeds?: any[] }
 ): Promise<void> {
-  return sendDiscordFilesMessage(
-    webhookUrl,
-    [{ buffer: fileBuffer, filename, contentType }],
-    message
-  )
+  try {
+    const formData = new FormData()
+    const blob = new Blob([new Uint8Array(fileBuffer)], { type: contentType })
+    formData.append('file', blob, filename)
+
+    if (typeof message === 'string' && message.trim()) {
+      formData.append('content', message)
+    } else if (message && typeof message === 'object') {
+      const payload: Record<string, unknown> = {}
+      if (message.content && message.content.trim()) payload.content = message.content
+      if (Array.isArray(message.embeds) && message.embeds.length > 0) payload.embeds = message.embeds
+      if (Object.keys(payload).length > 0) {
+        formData.append('payload_json', JSON.stringify(payload))
+      }
+    }
+
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Discord webhook failed (${res.status}): ${text.slice(0, 300)}`)
+    }
+  } catch (error) {
+    console.error('[webhook] Error sending single Discord file message:', error)
+  }
 }
 
 export async function sendDiscordFilesMessage(
@@ -499,6 +534,7 @@ export async function logAllanamientoCreado(input: {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
+    const discordImage = await prepareDiscordImage(input.pngBuffer)
     const filename = `allanamiento-${input.numero.replace(/[^a-zA-Z0-9-]/g, '-')}-solicitud.png`
 
     const callsign = input.callsignSolicitante || input.solicitadoPor
@@ -513,7 +549,7 @@ export async function logAllanamientoCreado(input: {
       `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
     ].join('\n')
 
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, input.pngBuffer, filename, 'image/png', messageText)
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, discordImage, filename, 'image/png', messageText)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento creado:', error)
   }
@@ -530,6 +566,7 @@ export async function logAllanamientoAutorizado(input: {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
+    const discordImage = await prepareDiscordImage(input.pngBuffer)
     const safeBase = input.numero.replace(/[^a-zA-Z0-9-]/g, '-')
     const filename = `allanamiento-${safeBase}-autorizado.png`
     const pdfFilename = `allanamiento-${safeBase}-autorizado.pdf`
@@ -548,7 +585,7 @@ export async function logAllanamientoAutorizado(input: {
       'Adjuntos: imagen + PDF',
     ].join('\n')
 
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, input.pngBuffer, filename, 'image/png', messageText)
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, discordImage, filename, 'image/png', messageText)
     if (input.pdfBuffer) {
       await sendDiscordFileMessage(
         ALLANAMIENTO_WEBHOOK,
