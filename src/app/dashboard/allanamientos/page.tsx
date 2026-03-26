@@ -157,76 +157,27 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId:string;
     }
   }
 
-  function imprimirPDF() {
+  async function descargarPDF() {
     if (!item) return
-    const html = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>ALL ${item.numeroSolicitud}</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Source+Serif+4:wght@400;600&family=Roboto+Mono:wght@400;600&display=swap');
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#f5f0e8;font-family:'Source Serif 4',serif;padding:40px;max-width:794px;margin:0 auto}
-.gold{color:#c9a227}.mono{font-family:'Roboto Mono',monospace;font-size:10px;letter-spacing:1px}
-.title{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:3px}
-.bar{height:4px;background:linear-gradient(90deg,#000,#c9a227,#e8c84a,#c9a227,#000);margin:10px 0}
-.header{display:flex;align-items:center;gap:20px;margin-bottom:16px;border-bottom:2px solid #c9a227;padding-bottom:16px}
-.section{margin:20px 0;border-left:4px solid #c9a227;padding-left:14px}
-.section h3{font-family:'Roboto Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#666;margin-bottom:8px}
-.section p{font-size:13px;line-height:1.7}
-.firma-area{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:30px}
-.firma-box{border:1px solid #c9a227;padding:20px;background:rgba(201,162,39,0.04)}
-.firma-box h4{font-family:'Roboto Mono',monospace;font-size:8px;letter-spacing:2px;color:#c9a227;text-transform:uppercase;margin-bottom:16px}
-.firma-line{height:60px;border-bottom:1px solid #c9a227;margin-bottom:8px}
-.firma-name{font-size:11px;color:#333}
-.firma-role{font-family:'Roboto Mono',monospace;font-size:8px;color:#666;letter-spacing:1px;text-transform:uppercase}
-.stamp{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'Bebas Neue',sans-serif;font-size:90px;color:rgba(${item.estado==='autorizado'?'0,100,0':'180,30,30'},0.1);letter-spacing:6px;pointer-events:none}
-.watermark{font-family:'Roboto Mono',monospace;font-size:8px;letter-spacing:2px;color:#999;text-transform:uppercase}
-.status-bar{background:#111;color:#fff;padding:6px 16px;display:flex;justify-content:space-between;margin:16px 0}
-.s-val{font-family:'Roboto Mono',monospace;font-size:9px}
-.s-active{color:#6bffa0}.s-high{color:#ffb347}.s-gold{color:#e8c84a}
-@media print{.stamp{position:fixed}body{padding:20px}}
-</style></head><body>
-<div class="bar"></div>
-<div class="header">
-  <img src="https://i.imgur.com/EAimMhx.png" style="width:72px;height:72px;object-fit:contain;filter:grayscale(1)"/>
-  <div>
-    <p class="mono gold">Federal Investigation Bureau — HQ</p>
-    <p class="title">Solicitud de Allanamiento</p>
-    <p class="mono" style="color:#666;letter-spacing:3px">REPORTE OPERATIVO CLASIFICADO</p>
-  </div>
-  <div style="margin-left:auto;text-align:right">
-    <p class="mono" style="font-size:8px;color:#666">N° SOLICITUD</p>
-    <p class="mono" style="font-size:14px;font-weight:600">${item.numeroSolicitud}</p>
-    <p class="mono" style="color:#666;margin-top:4px">${new Date(item.fechaSolicitud).toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p>
-    <p class="mono ${item.estado==='autorizado'?'s-active':item.estado==='denegado'?'' : 's-gold'}" style="margin-top:4px;text-transform:uppercase">${item.estado.toUpperCase()}</p>
-  </div>
-</div>
-<div class="bar"></div>
-<div class="status-bar">
-  <span class="s-val s-gold">UNIDAD: ${item.unidad}</span>
-  <span class="s-val s-active">AGENTE: ${item.nombreSolicitante}${item.callsignSolicitante?` [${item.callsignSolicitante}]`:''}</span>
-</div>
-<div class="section"><h3>Objetivo</h3><p><strong>Dirección:</strong> ${item.direccion}</p><p><strong>Sospechoso(s):</strong> ${item.sospechoso||'Sin identificar'}</p></div>
-<div class="section"><h3>Motivación / Fundamento Legal</h3><p style="white-space:pre-wrap">${item.motivacion}</p></div>
-${item.descripcion?`<div class="section"><h3>Descripción Operativa</h3><p style="white-space:pre-wrap">${item.descripcion}</p></div>`:''}
-${item.observaciones?`<div class="section"><h3>Observaciones</h3><p>${item.observaciones}</p></div>`:''}
-${item.motivoDenegacion?`<div class="section"><h3>Motivo de Denegación</h3><p style="color:#8b1c1c">${item.motivoDenegacion}</p></div>`:''}
-<div class="firma-area">
-${(item.firmas||[]).map((f:any)=>`
-  <div class="firma-box">
-    <h4>${f.tipo==='autorizacion'?'Autorización Oficial':'Firma de Supervisor'}</h4>
-    <div class="firma-line"></div>
-    <p class="firma-name">${f.nombre}${f.callsign?` [${f.callsign}]`:''}</p>
-    <p class="firma-role">${f.rol.replace('_',' ')} — ${new Date(f.fecha).toLocaleDateString('es')}</p>
-  </div>`).join('')}
-${item.firmas?.length===0?`
-  <div class="firma-box"><h4>Firma Autorizante</h4><div class="firma-line"></div><p class="firma-name">Pendiente</p></div>
-  <div class="firma-box"><h4>Firma Fiscal</h4><div class="firma-line"></div><p class="firma-name">Pendiente</p></div>`:''}
-</div>
-<div class="stamp">${item.estado.toUpperCase()}</div>
-<script>window.onload=()=>setTimeout(()=>window.print(),500)</script>
-</body></html>`
-    const w = window.open('','_blank'); if (w) { w.document.write(html); w.document.close() }
-  editarAllanamiento(itemId,{accion:'generar_pdf'}).then(()=>load()).catch(()=>{})
+    setSending(true)
+    try {
+      const response = await fetch(`/api/allanamientos/${itemId}/download-pdf`)
+      if (!response.ok) throw new Error('Error downloading PDF')
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `allanamiento-${item.numeroSolicitud.replace(/[^a-zA-Z0-9-]/g, '-')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      onAction('PDF descargado')
+    } catch (e: any) {
+      uiAlert(e?.message || 'No se pudo descargar el PDF', 'Descarga PDF')
+    } finally {
+      setSending(false)
+    }
   }
 
   if (loading) return <div className="modal-overlay"><div className="modal p-8 text-center font-mono text-xs text-tx-muted">Cargando...</div></div>
@@ -480,9 +431,9 @@ ${item.firmas?.length===0?`
         {tab==='pdf' && (
           <div className="flex-1 overflow-y-auto p-5">
             <div className="card p-5 mb-4">
-              <p className="section-tag mb-3">// Generar Documento Oficial</p>
-              <p className="text-xs text-tx-secondary mb-4 leading-relaxed">El PDF incluye todos los datos de la solicitud, observaciones y las firmas registradas de Supervisory / Command Staff. Se abrirá en una nueva ventana para imprimir o guardar.</p>
-              <button onClick={imprimirPDF} className="btn-primary"><FileText size={12}/>Generar PDF / Imprimir</button>
+              <p className="section-tag mb-3">// Descargar Documento Oficial</p>
+              <p className="text-xs text-tx-secondary mb-4 leading-relaxed">Descarga el PDF oficial que incluye todos los datos de la solicitud, observaciones y las firmas registradas de Supervisory / Command Staff.</p>
+              <button onClick={descargarPDF} disabled={sending} className="btn-primary"><FileText size={12}/>Descargar PDF</button>
             </div>
             {isSuperv && !yafirmo && item.estado!=='denegado' && (
               <div className="card p-5">

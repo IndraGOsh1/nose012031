@@ -97,20 +97,20 @@ export async function renderAllanamientoPNG(item: any): Promise<Buffer> {
             gap: 12,
           }}
         >
-          <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14 }}>
+          <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14, display: 'flex', flexDirection: 'column' }}>
             <span style={{ color: '#64748b', fontSize: 11, letterSpacing: 5, fontFamily: 'monospace' }}>OBJETIVO</span>
             <div style={{ marginTop: 8, fontSize: 36, lineHeight: 1.18, color: '#0f172a', fontFamily: 'Georgia, serif' }}>Direccion: {String(item.direccion || '—').slice(0, 120)}</div>
             <div style={{ marginTop: 4, fontSize: 36, lineHeight: 1.18, color: '#0f172a', fontFamily: 'Georgia, serif' }}>Sospechoso(s): {String(item.sospechoso || 'Sin identificar').slice(0, 120)}</div>
           </div>
 
-          <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14 }}>
+          <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14, display: 'flex', flexDirection: 'column' }}>
             <span style={{ color: '#64748b', fontSize: 11, letterSpacing: 5, fontFamily: 'monospace' }}>MOTIVACION / FUNDAMENTO LEGAL</span>
             <div style={{ marginTop: 8, fontSize: 34, lineHeight: 1.2, color: '#0f172a', fontFamily: 'Georgia, serif' }}>
               {motivacion}
             </div>
           </div>
 
-          <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14 }}>
+          <div style={{ borderLeft: '4px solid #c9a227', paddingLeft: 14, display: 'flex', flexDirection: 'column' }}>
             <span style={{ color: '#64748b', fontSize: 11, letterSpacing: 5, fontFamily: 'monospace' }}>DESCRIPCION OPERATIVA</span>
             <div style={{ marginTop: 8, fontSize: 34, lineHeight: 1.2, color: '#0f172a', fontFamily: 'Georgia, serif' }}>
               {descripcion}
