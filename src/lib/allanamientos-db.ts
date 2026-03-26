@@ -106,3 +106,17 @@ export function updateAllanamientoWithAuthorization(numeroSolicitud: string, aut
   const autCallsign = String(autorizadorCallsign || 'UNKNOWN').trim().slice(0, 20).toUpperCase()
   return `${callsignPart}-${autCallsign} //${resto}`
 }
+
+export function removeAllanamientoAuthorization(numeroSolicitud: string) {
+  const value = String(numeroSolicitud || '').trim()
+  if (!value.includes('//')) return value
+
+  const parts = value.split('//')
+  const left = parts[0]?.trim() || ''
+  const right = parts.slice(1).join('//').trim()
+  const lastDash = left.lastIndexOf('-')
+  if (lastDash < 0) return value
+
+  const solicitanteCallsign = left.slice(0, lastDash)
+  return `${solicitanteCallsign}-PENDING // ${right}`
+}

@@ -3,6 +3,12 @@
 import { getSecret } from './secrets'
 import sharp from 'sharp'
 
+type DiscordFilePayload = {
+  buffer: Buffer
+  filename: string
+  contentType: string
+}
+
 const WEBHOOKS = {
   extras:    getSecret('DISCORD_WEBHOOK_EXTRAS'),
   keys:      getSecret('DISCORD_WEBHOOK_KEYS'),
@@ -436,10 +442,24 @@ export async function sendDiscordFileMessage(
   filename: string,
   message?: string | { content?: string; embeds?: any[] }
 ): Promise<void> {
+  return sendDiscordFilesMessage(
+    webhookUrl,
+    [{ buffer: pngBuffer, filename, contentType: 'image/png' }],
+    message
+  )
+}
+
+export async function sendDiscordFilesMessage(
+  webhookUrl: string,
+  files: DiscordFilePayload[],
+  message?: string | { content?: string; embeds?: any[] }
+): Promise<void> {
   try {
     const formData = new FormData()
-    const blob = new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' })
-    formData.append('file', blob, filename)
+    files.forEach((file, index) => {
+      const blob = new Blob([new Uint8Array(file.buffer)], { type: file.contentType })
+      formData.append(`files[${index}]`, blob, file.filename)
+    })
 
     if (typeof message === 'string' && message.trim()) {
       formData.append('content', message)
@@ -478,11 +498,13 @@ export async function logAllanamientoCreado(input: {
 
     const callsign = input.callsignSolicitante || input.solicitadoPor
     const agente = input.numeroAgenteSolicitante || '—'
+    const cuenta = input.solicitadoPor || '—'
     const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
     const numSolicitud = numMatch ? numMatch[1] : input.numero
 
     const messageText = [
       '📋 **Nueva Solicitud de Allanamiento**',
+      `**Cuenta:** ${cuenta}`,
       `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
     ].join('\n')
 
@@ -498,24 +520,37 @@ export async function logAllanamientoAutorizado(input: {
   callsignAutorizador?: string | null
   numeroAgenteAutorizador?: string | null
   pngBuffer: Buffer
+  pdfBuffer?: Buffer
 }): Promise<void> {
   if (!ALLANAMIENTO_WEBHOOK) return
 
   try {
-    const filename = `allanamiento-${input.numero.replace(/[^a-zA-Z0-9-]/g, '-')}-autorizado.png`
+    const safeBase = input.numero.replace(/[^a-zA-Z0-9-]/g, '-')
+    const filename = `allanamiento-${safeBase}-autorizado.png`
+    const pdfFilename = `allanamiento-${safeBase}-autorizado.pdf`
 
     const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
     const numSolicitud = numMatch ? numMatch[1] : input.numero
 
     const callsign = input.callsignAutorizador || input.autorizadoPor
     const agente = input.numeroAgenteAutorizador || '—'
+    const cuenta = input.autorizadoPor || '—'
 
     const messageText = [
       '✅ **Allanamiento Autorizado**',
+      `**Cuenta:** ${cuenta}`,
       `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
+      'Adjuntos: PNG + PDF',
     ].join('\n')
 
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, input.pngBuffer, filename, messageText)
+    const files: DiscordFilePayload[] = [
+      { buffer: input.pngBuffer, filename, contentType: 'image/png' },
+    ]
+    if (input.pdfBuffer) {
+      files.push({ buffer: input.pdfBuffer, filename: pdfFilename, contentType: 'application/pdf' })
+    }
+
+    await sendDiscordFilesMessage(ALLANAMIENTO_WEBHOOK, files, messageText)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento autorizado:', error)
   }

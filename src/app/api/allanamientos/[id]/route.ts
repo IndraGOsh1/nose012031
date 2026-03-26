@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
-import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, updateAllanamientoWithAuthorization, type Firma } from '@/lib/allanamientos-db'
+import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, removeAllanamientoAuthorization, updateAllanamientoWithAuthorization, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
 import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado } from '@/lib/webhook'
-import { renderAllanamientoPNG } from '@/lib/allanamientos-preview'
+import { renderAllanamientoPDF, renderAllanamientoPNG } from '@/lib/allanamientos-preview'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
 
@@ -145,14 +145,38 @@ export async function PATCH(req: NextRequest, { params }:P) {
     // Reuse the same preview endpoint rendered in UI to keep Discord and app in sync.
     afterPersist.push(async () => {
       const pngBuffer = await renderAllanamientoPNG(next)
+      const pdfBuffer = await renderAllanamientoPDF(next)
       return logAllanamientoAutorizado({
         numero: next.numeroSolicitud,
         autorizadoPor: u.nombre || u.username,
         callsignAutorizador: autorizadorCallsign,
         numeroAgenteAutorizador: autorizadorNumero,
         pngBuffer,
+        pdfBuffer,
       }).catch(err => console.error('[PATCH autorizar]', err))
     })
+  }
+
+  if (accion === 'quitar_autorizacion') {
+    const canRevoke = isCS || isIndra
+    if (!canRevoke) return forbidden()
+    if (!['autorizado', 'ejecutado'].includes(next.estado)) return err('Solo se puede quitar autorizacion en estado autorizado/ejecutado')
+
+    next.estado = 'pendiente'
+    next.fechaEjecucion = undefined
+    next.motivoDenegacion = null
+    next.numeroSolicitud = removeAllanamientoAuthorization(next.numeroSolicitud)
+    next.firmas = []
+    next.mensajes.push({
+      id: uuid().slice(0,8),
+      autor: 'SYSTEM',
+      nombre: 'Sistema',
+      contenido: `↩️ Autorizacion retirada por ${u.nombre || u.username}`,
+      fecha: now,
+      tipo: 'accion',
+    })
+
+    afterPersist.push(() => logAllanamiento('Autorizacion retirada', next.numeroSolicitud, u.username))
   }
 
   if (accion === 'denegar' && isSuperv) {
@@ -270,7 +294,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
     }))
   }
 
-  if (accion && !['autorizar', 'denegar', 'ejecutar', 'firmar', 'generar_pdf', 'reporte_hallazgo', 'editar'].includes(accion)) {
+  if (accion && !['autorizar', 'quitar_autorizacion', 'denegar', 'ejecutar', 'firmar', 'generar_pdf', 'reporte_hallazgo', 'editar'].includes(accion)) {
     return err('Accion invalida')
   }
 

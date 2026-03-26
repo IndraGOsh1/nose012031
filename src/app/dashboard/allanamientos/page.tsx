@@ -270,6 +270,18 @@ ${item.firmas?.length===0?`
                 ><XCircle size={11}/>Denegar</button>
               </>}
               {item.estado==='autorizado' && <button onClick={()=>doAction('ejecutar')} disabled={sending} className="btn-primary py-1.5 px-3 text-[9px]">✅ Ejecutado</button>}
+              {isCS && ['autorizado','ejecutado'].includes(item.estado) && (
+                <button
+                  onClick={async()=>{
+                    if (!await uiConfirm('Esto quitara la autorizacion, reiniciara firmas y devolvera el estado a pendiente. ¿Continuar?', { title: 'Quitar autorizacion', tone: 'danger' })) return
+                    await doAction('quitar_autorizacion')
+                  }}
+                  disabled={sending}
+                  className="btn-danger py-1.5 px-3 text-[9px]"
+                >
+                  <XCircle size={11}/>Quitar autorizacion
+                </button>
+              )}
               {!yafirmo && item.estado!=='denegado' && <button onClick={()=>doAction('firmar',{tipoFirma:'supervisor'})} disabled={sending} className="btn-ghost py-1.5 px-3 text-[9px]"><PenTool size={11}/>Firmar</button>}
             </div>
           )}

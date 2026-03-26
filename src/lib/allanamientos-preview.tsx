@@ -2,6 +2,7 @@
 // Used by both the preview-image route and the Discord webhook
 // to avoid self-referencing HTTP calls on serverless.
 import { ImageResponse } from 'next/og'
+import { PDFDocument } from 'pdf-lib'
 
 function statusLabel(raw: string) {
   if (raw === 'autorizado') return 'AUTORIZADO'
@@ -135,4 +136,19 @@ export async function renderAllanamientoPNG(item: any): Promise<Buffer> {
   )
 
   return Buffer.from(await ir.arrayBuffer())
+}
+
+export async function renderAllanamientoPDF(item: any): Promise<Buffer> {
+  const pngBuffer = await renderAllanamientoPNG(item)
+  const pdf = await PDFDocument.create()
+  const pngImage = await pdf.embedPng(pngBuffer)
+  const page = pdf.addPage([pngImage.width, pngImage.height])
+  page.drawImage(pngImage, {
+    x: 0,
+    y: 0,
+    width: pngImage.width,
+    height: pngImage.height,
+  })
+  const bytes = await pdf.save()
+  return Buffer.from(bytes)
 }
