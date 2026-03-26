@@ -124,20 +124,16 @@ export async function renderAllanamientoPNG(item: any): Promise<Buffer> {
           </div>
 
           {/* OBSERVACIONES (conditional) */}
-          {observaciones ? (
-            <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '5px solid #3b82f6', paddingLeft: 20 }}>
-              <span style={{ color: '#3b82f6', fontSize: 11, letterSpacing: 5, fontFamily: 'monospace', marginBottom: 8 }}>OBSERVACIONES</span>
-              <span style={{ fontSize: 30, lineHeight: 1.38, color: '#334155', fontFamily: 'Georgia, serif' }}>{observaciones.slice(0, 440)}</span>
-            </div>
-          ) : null}
+          <div style={{ display: observaciones ? 'flex' : 'none', flexDirection: 'column', borderLeft: '5px solid #3b82f6', paddingLeft: 20 }}>
+            <span style={{ color: '#3b82f6', fontSize: 11, letterSpacing: 5, fontFamily: 'monospace', marginBottom: 8 }}>OBSERVACIONES</span>
+            <span style={{ fontSize: 30, lineHeight: 1.38, color: '#334155', fontFamily: 'Georgia, serif' }}>{observaciones.slice(0, 440)}</span>
+          </div>
 
           {/* CASO VINCULADO (conditional) */}
-          {casoVinculado ? (
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 14, background: '#1e293b', padding: '11px 18px' }}>
-              <span style={{ color: '#94a3b8', fontSize: 13, fontFamily: 'monospace', letterSpacing: 2 }}>CASO VINCULADO:</span>
-              <span style={{ color: '#e2e8f0', fontSize: 14, fontFamily: 'monospace' }}>{casoVinculado.slice(0, 90)}</span>
-            </div>
-          ) : null}
+          <div style={{ display: casoVinculado ? 'flex' : 'none', flexDirection: 'row', alignItems: 'center', gap: 14, background: '#1e293b', padding: '11px 18px' }}>
+            <span style={{ color: '#94a3b8', fontSize: 13, fontFamily: 'monospace', letterSpacing: 2 }}>CASO VINCULADO:</span>
+            <span style={{ color: '#e2e8f0', fontSize: 14, fontFamily: 'monospace' }}>{casoVinculado.slice(0, 90)}</span>
+          </div>
 
         </div>
 
