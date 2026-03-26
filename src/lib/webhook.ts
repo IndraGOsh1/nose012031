@@ -598,7 +598,7 @@ export async function logAllanamientoAutorizado(input: {
       '✅ **Allanamiento Autorizado**',
       `**Cuenta:** ${cuenta}`,
       `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
-      'Adjuntos: imagen + PDF',
+      input.pdfBuffer ? 'Adjuntos: imagen + PDF' : 'Adjuntos: imagen',
     ].join('\n')
 
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, discordImage, filename, 'image/png', messageText)
@@ -620,6 +620,48 @@ export async function logAllanamientoAutorizado(input: {
     await sendDiscordTextMessage(
       ALLANAMIENTO_WEBHOOK,
       `⚠️ Allanamiento autorizado (sin adjunto): ${callsign} - N° agente ${agente} | Solicitud ${numSolicitud}`
+    )
+  }
+}
+
+export async function logAllanamientoEjecutado(input: {
+  numero: string
+  ejecutadoPor: string
+  callsignEjecutor?: string | null
+  numeroAgenteEjecutor?: string | null
+  pngBuffer: Buffer
+}): Promise<void> {
+  if (!ALLANAMIENTO_WEBHOOK) return
+
+  try {
+    const discordImage = await prepareDiscordImage(input.pngBuffer)
+    const safeBase = input.numero.replace(/[^a-zA-Z0-9-]/g, '-')
+    const filename = `allanamiento-${safeBase}-ejecutado.png`
+
+    const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
+    const numSolicitud = numMatch ? numMatch[1] : input.numero
+
+    const callsign = input.callsignEjecutor || input.ejecutadoPor
+    const agente = input.numeroAgenteEjecutor || '—'
+    const cuenta = input.ejecutadoPor || '—'
+
+    const messageText = [
+      '✅ **Allanamiento Ejecutado**',
+      `**Cuenta:** ${cuenta}`,
+      `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
+      'Adjuntos: imagen',
+    ].join('\n')
+
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, discordImage, filename, 'image/png', messageText)
+  } catch (error) {
+    console.error('[webhook] Error logging allanamiento ejecutado:', error)
+    const callsign = input.callsignEjecutor || input.ejecutadoPor
+    const agente = input.numeroAgenteEjecutor || '—'
+    const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
+    const numSolicitud = numMatch ? numMatch[1] : input.numero
+    await sendDiscordTextMessage(
+      ALLANAMIENTO_WEBHOOK,
+      `⚠️ Allanamiento ejecutado (sin adjunto): ${callsign} - N° agente ${agente} | Solicitud ${numSolicitud}`
     )
   }
 }

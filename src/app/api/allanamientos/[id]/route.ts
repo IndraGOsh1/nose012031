@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
 import { deleteAllanamientoById, getAllanamientosDB, persistAllanamiento, removeAllanamientoAuthorization, updateAllanamientoWithAuthorization, type Firma } from '@/lib/allanamientos-db'
 import { getDB } from '@/lib/db'
-import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado } from '@/lib/webhook'
+import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHallazgo, logAllanamientoAutorizado, logAllanamientoEjecutado } from '@/lib/webhook'
 import { renderAllanamientoPDF, renderAllanamientoPNG } from '@/lib/allanamientos-preview'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
@@ -145,7 +145,12 @@ export async function PATCH(req: NextRequest, { params }:P) {
     // Reuse the same preview endpoint rendered in UI to keep Discord and app in sync.
     afterPersist.push(async () => {
       const pngBuffer = await renderAllanamientoPNG(next)
-      const pdfBuffer = await renderAllanamientoPDF(next)
+      let pdfBuffer: Buffer | undefined
+      try {
+        pdfBuffer = await renderAllanamientoPDF(next)
+      } catch (pdfError) {
+        console.error('[PATCH autorizar] Failed to render PDF for webhook:', pdfError)
+      }
       return logAllanamientoAutorizado({
         numero: next.numeroSolicitud,
         autorizadoPor: u.nombre || u.username,
@@ -193,6 +198,32 @@ export async function PATCH(req: NextRequest, { params }:P) {
     next.estado = 'ejecutado'; next.fechaEjecucion = now
     next.mensajes.push({ id:uuid().slice(0,8), autor:'SYSTEM', nombre:'Sistema',
       contenido:`✅ Marcado como ejecutado por ${u.nombre||u.username}`, fecha:now, tipo:'accion' })
+
+    let ejecutorCallsign = userProfile?.callsign || null
+    let ejecutorNumero = userProfile?.agentNumber || '—'
+    try {
+      const rows = await getRows(CONFIG.sheets.personal)
+      const idxByName = findAgent(rows, String(userProfile?.nombre || u.nombre || u.username || ''))
+      const idxByNum = ejecutorNumero ? findAgent(rows, String(ejecutorNumero)) : -1
+      const idx = idxByName >= 0 ? idxByName : idxByNum
+      if (idx >= 0) {
+        ejecutorCallsign = rows[idx]?.[COL.APODO] || ejecutorCallsign
+        ejecutorNumero = rows[idx]?.[COL.NUMERO] || ejecutorNumero
+      }
+    } catch {
+      // Fallback to local profile metadata when sheets is unavailable.
+    }
+
+    afterPersist.push(async () => {
+      const pngBuffer = await renderAllanamientoPNG(next)
+      return logAllanamientoEjecutado({
+        numero: next.numeroSolicitud,
+        ejecutadoPor: u.nombre || u.username,
+        callsignEjecutor: ejecutorCallsign,
+        numeroAgenteEjecutor: ejecutorNumero,
+        pngBuffer,
+      }).catch(err => console.error('[PATCH ejecutar]', err))
+    })
   }
 
   if (accion === 'firmar' && isSuperv) {
