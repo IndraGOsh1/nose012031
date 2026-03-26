@@ -2,6 +2,7 @@
 // Sends structured embeds to different webhook channels
 import { getSecret } from './secrets'
 import sharp from 'sharp'
+import { recordAuditEvent } from './audit-log'
 
 type DiscordFilePayload = {
   buffer: Buffer
@@ -55,6 +56,13 @@ export async function logWebhook(payload: WebhookPayload) {
   if (!url) {
     if (!global.__fibWebhookMissingWarned[payload.type]) {
       console.warn(`[webhook] Missing env for channel: ${payload.type}`)
+      void recordAuditEvent({
+        level: 'warn',
+        source: 'webhook',
+        event: 'missing_channel_env',
+        message: `Missing env for channel: ${payload.type}`,
+        meta: { channel: payload.type },
+      }).catch(() => {})
       global.__fibWebhookMissingWarned[payload.type] = true
     }
     return
@@ -70,12 +78,39 @@ export async function logWebhook(payload: WebhookPayload) {
   }
 
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ embeds: [embed] }),
     })
-  } catch {}
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      void recordAuditEvent({
+        level: 'error',
+        source: 'webhook',
+        event: 'discord_embed_failed',
+        message: `Discord webhook failed (${res.status})`,
+        meta: { channel: payload.type, title: payload.title, body: text.slice(0, 300) },
+      }).catch(() => {})
+      return
+    }
+
+    void recordAuditEvent({
+      level: 'info',
+      source: 'webhook',
+      event: 'discord_embed_sent',
+      message: payload.title,
+      meta: { channel: payload.type },
+    }).catch(() => {})
+  } catch (error) {
+    void recordAuditEvent({
+      level: 'error',
+      source: 'webhook',
+      event: 'discord_embed_exception',
+      message: payload.title,
+      meta: { channel: payload.type, error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => {})
+  }
 }
 
 // Helpers
@@ -432,6 +467,13 @@ export async function renderSVGToPNG(svgString: string, width: number = 1920, he
     return png
   } catch (error) {
     console.error('[webhook] Error rendering SVG to PNG:', error)
+    void recordAuditEvent({
+      level: 'error',
+      source: 'webhook',
+      event: 'render_svg_to_png_failed',
+      message: 'Error rendering SVG to PNG',
+      meta: { width, height, error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => {})
     throw new Error('Failed to render SVG to PNG')
   }
 }
@@ -483,13 +525,38 @@ export async function sendDiscordFileMessage(
 
 async function sendDiscordTextMessage(webhookUrl: string, content: string) {
   try {
-    await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      void recordAuditEvent({
+        level: 'error',
+        source: 'webhook',
+        event: 'discord_fallback_text_failed',
+        message: `Discord fallback text failed (${res.status})`,
+        meta: { body: text.slice(0, 300), content: content.slice(0, 500) },
+      }).catch(() => {})
+      return
+    }
+
+    void recordAuditEvent({
+      level: 'warn',
+      source: 'webhook',
+      event: 'discord_fallback_text_sent',
+      message: content.slice(0, 500),
+    }).catch(() => {})
   } catch (error) {
     console.error('[webhook] Error sending fallback text message:', error)
+    void recordAuditEvent({
+      level: 'error',
+      source: 'webhook',
+      event: 'discord_fallback_text_exception',
+      message: content.slice(0, 500),
+      meta: { error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => {})
   }
 }
 
@@ -524,8 +591,23 @@ export async function sendDiscordFilesMessage(
       const text = await res.text().catch(() => '')
       throw new Error(`Discord webhook failed (${res.status}): ${text.slice(0, 300)}`)
     }
+
+    void recordAuditEvent({
+      level: 'info',
+      source: 'webhook',
+      event: 'discord_files_sent',
+      message: `Sent ${files.length} files`,
+      meta: { files: files.length },
+    }).catch(() => {})
   } catch (error) {
     console.error('[webhook] Error sending Discord file message:', error)
+    void recordAuditEvent({
+      level: 'error',
+      source: 'webhook',
+      event: 'discord_files_send_failed',
+      message: 'Error sending Discord file message',
+      meta: { files: files.length, error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => {})
   }
 }
 

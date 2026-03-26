@@ -321,6 +321,41 @@ CREATE TABLE IF NOT EXISTS carpetas (
 
 ALTER TABLE carpetas ADD COLUMN IF NOT EXISTS hilos JSONB NOT NULL DEFAULT '[]'::jsonb;
 
+-- ── Audit Logs ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id            TEXT PRIMARY KEY,
+  "timestamp"   TIMESTAMPTZ DEFAULT now(),
+  level         TEXT NOT NULL DEFAULT 'info',
+  source        TEXT NOT NULL,
+  event         TEXT NOT NULL,
+  message       TEXT NOT NULL,
+  actor         TEXT,
+  meta          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  "resentCount" INTEGER NOT NULL DEFAULT 0,
+  "lastResentAt" TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp_desc ON audit_logs ("timestamp" DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_level ON audit_logs (level);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_source ON audit_logs (source);
+
+-- ── Bot Keys ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bot_keys (
+  id            TEXT PRIMARY KEY,
+  label         TEXT NOT NULL,
+  "keyHash"      TEXT NOT NULL,
+  "keyEncrypted" TEXT NOT NULL,
+  scope         TEXT NOT NULL DEFAULT 'discord-bot',
+  "createdAt"    TIMESTAMPTZ DEFAULT now(),
+  "createdBy"    TEXT NOT NULL,
+  "lastUsedAt"   TIMESTAMPTZ,
+  "revokedAt"    TIMESTAMPTZ,
+  "revokedBy"    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_bot_keys_created_at_desc ON bot_keys ("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_bot_keys_revoked ON bot_keys ("revokedAt");
+
 -- ── RLS Policies (disable for service role, enable if using anon) ─
 -- If using SUPABASE_SERVICE_ROLE_KEY, RLS is bypassed automatically.
 -- If using anon key, uncomment and adjust these policies:

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getAllanamientosDB } from '@/lib/allanamientos-db'
 import { renderAllanamientoPDF } from '@/lib/allanamientos-preview'
+import { recordAuditEvent } from '@/lib/audit-log'
 
 type P = { params: Promise<{ id: string }> }
 
@@ -27,6 +28,13 @@ export async function GET(_req: NextRequest, { params }: P) {
     })
   } catch (error) {
     console.error('[allanamientos] Error generating PDF:', error)
+    void recordAuditEvent({
+      level: 'error',
+      source: 'allanamientos',
+      event: 'download_pdf_failed',
+      message: 'Error generating allanamiento PDF',
+      meta: { id, error: error instanceof Error ? error.message : String(error) },
+    }).catch(() => {})
     return new Response('Error generating PDF', { status: 500 })
   }
 }

@@ -7,6 +7,7 @@ import { logAllanamiento, logAllanamientoCreado } from '@/lib/webhook'
 import { renderAllanamientoPNG } from '@/lib/allanamientos-preview'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
+import { recordAuditEvent } from '@/lib/audit-log'
 
 export async function GET(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
@@ -82,6 +83,14 @@ export async function POST(req: NextRequest) {
       pngBuffer = await renderAllanamientoPNG(all)
     } catch (error) {
       console.error('[POST allanamientos] Error rendering PNG:', error)
+      void recordAuditEvent({
+        level: 'error',
+        source: 'allanamientos',
+        event: 'create_render_png_failed',
+        message: 'Failed to render PNG after allanamiento create',
+        actor: u.username,
+        meta: { id: all.id, numeroSolicitud: all.numeroSolicitud, error: error instanceof Error ? error.message : String(error) },
+      }).catch(() => {})
     }
 
     await logAllanamientoCreado({

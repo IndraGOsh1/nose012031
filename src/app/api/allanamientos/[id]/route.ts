@@ -7,6 +7,7 @@ import { logAllanamiento, logAllanamientoDocumentoGenerado, logAllanamientoHalla
 import { renderAllanamientoPDF, renderAllanamientoPNG } from '@/lib/allanamientos-preview'
 import { getRows, findAgent, COL } from '@/lib/sheets'
 import { CONFIG } from '@/lib/config'
+import { recordAuditEvent } from '@/lib/audit-log'
 
 type P = { params: Promise<{id:string}> }
 
@@ -149,12 +150,28 @@ export async function PATCH(req: NextRequest, { params }:P) {
         pngBuffer = await renderAllanamientoPNG(next)
       } catch (pngError) {
         console.error('[PATCH autorizar] Failed to render PNG for webhook:', pngError)
+        void recordAuditEvent({
+          level: 'error',
+          source: 'allanamientos',
+          event: 'autorizar_render_png_failed',
+          message: 'Failed to render PNG during authorize flow',
+          actor: u.username,
+          meta: { id: next.id, numeroSolicitud: next.numeroSolicitud, error: pngError instanceof Error ? pngError.message : String(pngError) },
+        }).catch(() => {})
       }
       let pdfBuffer: Buffer | undefined
       try {
         pdfBuffer = await renderAllanamientoPDF(next)
       } catch (pdfError) {
         console.error('[PATCH autorizar] Failed to render PDF for webhook:', pdfError)
+        void recordAuditEvent({
+          level: 'error',
+          source: 'allanamientos',
+          event: 'autorizar_render_pdf_failed',
+          message: 'Failed to render PDF during authorize flow',
+          actor: u.username,
+          meta: { id: next.id, numeroSolicitud: next.numeroSolicitud, error: pdfError instanceof Error ? pdfError.message : String(pdfError) },
+        }).catch(() => {})
       }
       return logAllanamientoAutorizado({
         numero: next.numeroSolicitud,
@@ -225,6 +242,14 @@ export async function PATCH(req: NextRequest, { params }:P) {
         pngBuffer = await renderAllanamientoPNG(next)
       } catch (pngError) {
         console.error('[PATCH ejecutar] Failed to render PNG for webhook:', pngError)
+        void recordAuditEvent({
+          level: 'error',
+          source: 'allanamientos',
+          event: 'ejecutar_render_png_failed',
+          message: 'Failed to render PNG during execute flow',
+          actor: u.username,
+          meta: { id: next.id, numeroSolicitud: next.numeroSolicitud, error: pngError instanceof Error ? pngError.message : String(pngError) },
+        }).catch(() => {})
       }
       return logAllanamientoEjecutado({
         numero: next.numeroSolicitud,
