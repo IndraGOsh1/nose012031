@@ -455,33 +455,41 @@ export async function sendDiscordFileMessage(
   contentType: string = 'image/png',
   message?: string | { content?: string; embeds?: any[] }
 ): Promise<void> {
+  const formData = new FormData()
+  const blob = new Blob([new Uint8Array(fileBuffer)], { type: contentType })
+  formData.append('file', blob, filename)
+
+  if (typeof message === 'string' && message.trim()) {
+    formData.append('content', message)
+  } else if (message && typeof message === 'object') {
+    const payload: Record<string, unknown> = {}
+    if (message.content && message.content.trim()) payload.content = message.content
+    if (Array.isArray(message.embeds) && message.embeds.length > 0) payload.embeds = message.embeds
+    if (Object.keys(payload).length > 0) {
+      formData.append('payload_json', JSON.stringify(payload))
+    }
+  }
+
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Discord webhook failed (${res.status}): ${text.slice(0, 300)}`)
+  }
+}
+
+async function sendDiscordTextMessage(webhookUrl: string, content: string) {
   try {
-    const formData = new FormData()
-    const blob = new Blob([new Uint8Array(fileBuffer)], { type: contentType })
-    formData.append('file', blob, filename)
-
-    if (typeof message === 'string' && message.trim()) {
-      formData.append('content', message)
-    } else if (message && typeof message === 'object') {
-      const payload: Record<string, unknown> = {}
-      if (message.content && message.content.trim()) payload.content = message.content
-      if (Array.isArray(message.embeds) && message.embeds.length > 0) payload.embeds = message.embeds
-      if (Object.keys(payload).length > 0) {
-        formData.append('payload_json', JSON.stringify(payload))
-      }
-    }
-
-    const res = await fetch(webhookUrl, {
+    await fetch(webhookUrl, {
       method: 'POST',
-      body: formData,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
     })
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new Error(`Discord webhook failed (${res.status}): ${text.slice(0, 300)}`)
-    }
   } catch (error) {
-    console.error('[webhook] Error sending single Discord file message:', error)
+    console.error('[webhook] Error sending fallback text message:', error)
   }
 }
 
@@ -552,6 +560,14 @@ export async function logAllanamientoCreado(input: {
     await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, discordImage, filename, 'image/png', messageText)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento creado:', error)
+    const callsign = input.callsignSolicitante || input.solicitadoPor
+    const agente = input.numeroAgenteSolicitante || '—'
+    const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
+    const numSolicitud = numMatch ? numMatch[1] : input.numero
+    await sendDiscordTextMessage(
+      ALLANAMIENTO_WEBHOOK,
+      `⚠️ Allanamiento creado (sin adjunto): ${callsign} - N° agente ${agente} | Solicitud ${numSolicitud}`
+    )
   }
 }
 
@@ -597,5 +613,13 @@ export async function logAllanamientoAutorizado(input: {
     }
   } catch (error) {
     console.error('[webhook] Error logging allanamiento autorizado:', error)
+    const callsign = input.callsignAutorizador || input.autorizadoPor
+    const agente = input.numeroAgenteAutorizador || '—'
+    const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
+    const numSolicitud = numMatch ? numMatch[1] : input.numero
+    await sendDiscordTextMessage(
+      ALLANAMIENTO_WEBHOOK,
+      `⚠️ Allanamiento autorizado (sin adjunto): ${callsign} - N° agente ${agente} | Solicitud ${numSolicitud}`
+    )
   }
 }

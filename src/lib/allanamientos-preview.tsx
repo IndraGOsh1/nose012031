@@ -61,7 +61,9 @@ export async function renderAllanamientoPNG(item: any): Promise<Buffer> {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 34, gap: 30 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flex: 1, minWidth: 0 }}>
-            <img src="https://i.imgur.com/EAimMhx.png" alt="FIB" style={{ width: 80, height: 80, objectFit: 'contain', filter: 'grayscale(1)' }} />
+            <div style={{ width: 80, height: 80, border: '2px solid #111827', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', fontWeight: 700, fontSize: 26, color: '#111827' }}>
+              FIB
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ color: '#a16207', fontSize: 14, letterSpacing: 3, fontFamily: 'monospace' }}>Federal Investigation Bureau - HQ</span>
               <span style={{ color: '#111827', fontSize: 54, fontWeight: 700, letterSpacing: 2, marginTop: 8 }}>SOLICITUD DE ALLANAMIENTO</span>
