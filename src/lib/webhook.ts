@@ -542,30 +542,20 @@ export async function logAllanamientoAutorizado(input: {
     }
 
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
-    
-    const messageContent = '✅ Allanamiento Autorizado'
-    
-    const embed = {
-      title: '✅ Allanamiento Autorizado',
-      color: COLORS.green,
-      fields: [
-        { name: 'N° Solicitud', value: input.numero, inline: true },
-        { name: 'Autorizado por', value: input.autorizadoPor, inline: true },
-        { name: 'Dirección', value: input.direccion.slice(0, 1024), inline: false },
-        { name: 'Solicitante', value: input.solicitadoPor, inline: true },
-        { name: 'Callsign solicitante', value: input.callsignSolicitante || '—', inline: true },
-        { name: 'N° agente solicitante', value: input.numeroAgenteSolicitante || '—', inline: true },
-        { name: 'Callsign autorizador', value: input.callsignAutorizador || '—', inline: true },
-        { name: 'N° agente autorizador', value: input.numeroAgenteAutorizador || '—', inline: true },
-      ],
-      timestamp: new Date().toISOString(),
-      footer: { text: 'FIB HQ — Documento autorizado' },
-    }
 
-    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, {
-      content: messageContent,
-      embeds: [embed],
-    })
+    // Extract just the sequence number from "CALLSIGN-CALLSIGN // Numero de solicitud: ##"
+    const numMatch = input.numero.match(/:\s*(\d+)\s*$/)
+    const numSolicitud = numMatch ? numMatch[1] : input.numero
+
+    const callsign = input.callsignAutorizador || input.autorizadoPor
+    const agente = input.numeroAgenteAutorizador || '—'
+
+    const messageText = [
+      '✅ **Allanamiento Autorizado**',
+      `**${callsign}** - Numero de agente: **${agente}** | Num. Solicitud: **${numSolicitud}**`,
+    ].join('\n')
+
+    await sendDiscordFileMessage(ALLANAMIENTO_WEBHOOK, png, filename, messageText)
   } catch (error) {
     console.error('[webhook] Error logging allanamiento autorizado:', error)
   }
