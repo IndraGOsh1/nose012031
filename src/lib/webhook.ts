@@ -489,13 +489,7 @@ export async function logAllanamientoCreado(input: {
 
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-solicitud.png`
     
-    const messageContent = [
-      `**📋 Nueva Solicitud de Allanamiento**`,
-      `\`${input.numero}\` | ${input.direccion}`,
-      `**Solicitante:** ${input.solicitadoPor}`,
-      `**Callsign:** ${input.callsignSolicitante || '—'}`,
-      `**N° Agente:** ${input.numeroAgenteSolicitante || '—'}`,
-    ].join('\n')
+    const messageContent = '📋 Nueva Solicitud de Allanamiento'
     
     const embed = {
       color: COLORS.yellow,
@@ -549,18 +543,7 @@ export async function logAllanamientoAutorizado(input: {
 
     const filename = `allanamiento-${input.numero.replace(/\//g, '-')}-autorizado.png`
     
-    const messageContent = [
-      `✅ **Allanamiento Autorizado**`,
-      `\`${input.numero}\` | ${input.direccion}`,
-      `Solicitante: ${input.solicitadoPor}`,
-      `Callsign solicitante: ${input.callsignSolicitante || '—'}`,
-      `N° agente solicitante: ${input.numeroAgenteSolicitante || '—'}`,
-      ``,
-      `-`,
-      `Autorizado por: ${input.autorizadoPor}`,
-      `Callsign autorizador: ${input.callsignAutorizador || '—'}`,
-      `N° agente autorizador: ${input.numeroAgenteAutorizador || '—'}`,
-    ].join('\n')
+    const messageContent = '✅ Allanamiento Autorizado'
     
     const embed = {
       title: '✅ Allanamiento Autorizado',
@@ -575,7 +558,6 @@ export async function logAllanamientoAutorizado(input: {
         { name: 'Callsign autorizador', value: input.callsignAutorizador || '—', inline: true },
         { name: 'N° agente autorizador', value: input.numeroAgenteAutorizador || '—', inline: true },
       ],
-      image: { url: `attachment://${filename}` },
       timestamp: new Date().toISOString(),
       footer: { text: 'FIB HQ — Documento autorizado' },
     }

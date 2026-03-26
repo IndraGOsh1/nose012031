@@ -142,7 +142,6 @@ export async function PATCH(req: NextRequest, { params }:P) {
     next.numeroSolicitud = updateAllanamientoWithAuthorization(next.numeroSolicitud, autorizadorCallsign || u.username)
     
     const previewUrl = buildPreviewUrl(req, next.id)
-    afterPersist.push(() => logAllanamiento('Autorizado', next.numeroSolicitud, u.username))
 
     // Reuse the same preview endpoint rendered in UI to keep Discord and app in sync.
     afterPersist.push(() => logAllanamientoAutorizado({
