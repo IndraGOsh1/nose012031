@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { getUser, unauthorized, forbidden, err } from '@/lib/auth'
-import { deleteInviteByCode, getDB, persistInvite, type Rol } from '@/lib/db'
+import { deleteInviteByCode, getDB, listInvitesFresh, persistInvite, type Rol } from '@/lib/db'
 import { logInviteCodes } from '@/lib/webhook'
 import { getRequestIp, rateLimit } from '@/lib/security'
 
@@ -10,9 +10,9 @@ const ROLES: Rol[] = ['command_staff','supervisory','federal_agent','visitante']
 export async function GET(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
   if (!['command_staff','supervisory'].includes(u.rol)) return forbidden()
-  const db = await getDB()
+  const rows = await listInvitesFresh()
   return NextResponse.json(
-    Array.from(db.invites.values())
+    rows
       .map(i => ({ ...i, agotado: i.usos >= i.maxUsos }))
       .sort((a,b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime())
   )

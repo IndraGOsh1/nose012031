@@ -137,6 +137,56 @@ export async function persistInvite(invite: Invite) {
   if (error) throw new Error(`[db] No se pudo persistir invitacion: ${error.message}`)
 }
 
+export async function listUsersFresh(): Promise<User[]> {
+  const db = await getDB()
+  const fallback = Array.from(db.users.values())
+  if (!isSupabaseEnabled) return fallback
+
+  const client = getAdminClient()
+  if (!client) return fallback
+  const { data, error } = await (client.from('users') as any).select('*')
+  if (error || !Array.isArray(data)) return fallback
+
+  const rows = data as User[]
+  for (const row of rows) db.users.set(row.id, row)
+  return rows
+}
+
+export async function listInvitesFresh(): Promise<Invite[]> {
+  const db = await getDB()
+  const fallback = Array.from(db.invites.values())
+  if (!isSupabaseEnabled) return fallback
+
+  const client = getAdminClient()
+  if (!client) return fallback
+  const { data, error } = await (client.from('invites') as any).select('*')
+  if (error || !Array.isArray(data)) return fallback
+
+  const rows = data as Invite[]
+  for (const row of rows) db.invites.set(String(row.codigo || '').toUpperCase(), { ...row, codigo: String(row.codigo || '').toUpperCase() })
+  return rows.map((row) => ({ ...row, codigo: String(row.codigo || '').toUpperCase() }))
+}
+
+export async function findInviteByCode(codigo: string): Promise<Invite | null> {
+  const db = await getDB()
+  const code = String(codigo || '').trim().toUpperCase()
+  if (!code) return null
+
+  const local = db.invites.get(code)
+  if (local) return local
+
+  if (!isSupabaseEnabled) return null
+  const client = getAdminClient()
+  if (!client) return null
+
+  const { data, error } = await (client.from('invites') as any).select('*').eq('codigo', code).maybeSingle()
+  if (error || !data) return null
+
+  const invite = { ...(data as Invite), codigo: code }
+  db.invites.set(code, invite)
+  return invite
+}
+
 export async function deleteInviteByCode(codigo: string) {
   if (!isSupabaseEnabled) return
   const client = getAdminClient()

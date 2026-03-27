@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
-import { getDB, persistUserAndInvite } from '@/lib/db'
+import { findInviteByCode, getDB, listUsersFresh, persistUserAndInvite } from '@/lib/db'
 import { signToken, err } from '@/lib/auth'
 import { logRegister } from '@/lib/webhook'
 import { getRequestIp, isStrongEnoughPassword, rateLimit } from '@/lib/security'
@@ -21,10 +21,11 @@ export async function POST(req: NextRequest) {
   const codigoRaw = String(codigo).trim()
   const codigoNorm = codigoRaw.toUpperCase()
   const db = await getDB()
-  const inv = db.invites.get(codigoNorm) || db.invites.get(codigoRaw)
+  const inv = await findInviteByCode(codigoNorm) || await findInviteByCode(codigoRaw)
   if (!inv) return err('Código de invitación inválido')
   if (inv.usos >= inv.maxUsos) return err(`Código agotado (${inv.usos}/${inv.maxUsos} usos)`)
-  for (const u of db.users.values())
+  const users = await listUsersFresh()
+  for (const u of users)
     if (u.username.toLowerCase() === normalizedUsername) return err('Ese nombre de usuario ya existe')
   const id = uuid()
   const passwordHash = await bcrypt.hash(password, 12)

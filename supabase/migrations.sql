@@ -27,6 +27,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS "vetoReason" TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "vetoAt" TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "vetoBy" TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS clases JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS congelado BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "congeladoReason" TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "congeladoAt" TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "congeladoPor" TEXT;
 
 -- ── Invites ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS invites (
@@ -292,14 +296,10 @@ CREATE TABLE IF NOT EXISTS form_submissions (
 ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS "byClasses" JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'active';
 
--- Restricciones para oposiciones: un envio activo por usuario o IP por formulario.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_form_submissions_oposicion_user_once
-ON form_submissions ("formId", "byUser")
-WHERE state <> 'removed' AND "formId" IN (SELECT id FROM forms WHERE kind = 'oposicion');
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_form_submissions_oposicion_ip_once
-ON form_submissions ("formId", ip)
-WHERE state <> 'removed' AND ip IS NOT NULL AND ip <> '' AND "formId" IN (SELECT id FROM forms WHERE kind = 'oposicion');
+-- Índices para form_submissions
+CREATE INDEX IF NOT EXISTS idx_form_submissions_form_id ON form_submissions ("formId");
+CREATE INDEX IF NOT EXISTS idx_form_submissions_by_user ON form_submissions ("byUser");
+CREATE INDEX IF NOT EXISTS idx_form_submissions_state   ON form_submissions (state);
 
 CREATE TABLE IF NOT EXISTS forms_config (
   id                  TEXT PRIMARY KEY,
@@ -356,7 +356,6 @@ CREATE TABLE IF NOT EXISTS bot_keys (
 CREATE INDEX IF NOT EXISTS idx_bot_keys_created_at_desc ON bot_keys ("createdAt" DESC);
 CREATE INDEX IF NOT EXISTS idx_bot_keys_revoked ON bot_keys ("revokedAt");
 
--- ── RLS Policies (disable for service role, enable if using anon) ─
 -- If using SUPABASE_SERVICE_ROLE_KEY, RLS is bypassed automatically.
 -- If using anon key, uncomment and adjust these policies:
 

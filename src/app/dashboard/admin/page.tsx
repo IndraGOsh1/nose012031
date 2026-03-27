@@ -21,6 +21,8 @@ import {
   crearInvite,
   borrarInvite,
   getUsers,
+  getCarpetaByUsername,
+  crearHiloCarpeta,
   editarUser,
   borrarUser,
   getForms,
@@ -36,7 +38,7 @@ import { uiConfirm } from '@/lib/ui-dialog'
 import { FORM_BRANCHES, FORM_CLASSES } from '@/lib/forms-db'
 import { buildGoogleFormUrls } from '@/lib/google-forms'
 
-type Tab = 'invites' | 'users' | 'callsigns' | 'forms' | 'website'
+type Tab = 'invites' | 'users' | 'callsigns' | 'carpetas' | 'forms' | 'website'
 type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image'
 
 type BuilderField = {
@@ -131,6 +133,13 @@ export default function AdminPage() {
   const [formStartedAt, setFormStartedAt] = useState<Record<string, number>>({})
   const [websiteConfig, setWebsiteConfig] = useState<any>(null)
   const [websiteSaving, setWebsiteSaving] = useState(false)
+  const [usersSearch, setUsersSearch] = useState('')
+  const [carpetaTargetUsername, setCarpetaTargetUsername] = useState('')
+  const [carpetaTargetName, setCarpetaTargetName] = useState('')
+  const [carpetaThreadTitle, setCarpetaThreadTitle] = useState('')
+  const [carpetaThreadDesc, setCarpetaThreadDesc] = useState('')
+  const [carpetaThreadParticipants, setCarpetaThreadParticipants] = useState('')
+  const [carpetaPreview, setCarpetaPreview] = useState<any>(null)
 
   const isCS = user?.rol === 'command_staff'
   const canManageForms = ['command_staff', 'supervisory'].includes(user?.rol)
@@ -146,7 +155,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (tab === 'invites') loadInvites()
-    if (tab === 'users' || tab === 'callsigns') loadUsers()
+    if (tab === 'users' || tab === 'callsigns' || tab === 'carpetas') loadUsers()
     if (tab === 'forms') loadForms()
     if (tab === 'website') loadWebsiteConfig()
   }, [tab])
@@ -164,10 +173,62 @@ export default function AdminPage() {
   async function loadUsers() {
     setLoading(true)
     try {
-      setUsers(await getUsers())
+      const q = usersSearch.trim()
+      setUsers(await getUsers(q ? { q } : undefined))
     } catch {
     } finally {
       setLoading(false)
+    }
+  }
+
+  function resolveTargetUsername() {
+    const direct = carpetaTargetUsername.trim().toLowerCase()
+    if (direct) return direct
+    const byName = carpetaTargetName.trim().toLowerCase()
+    if (!byName) return ''
+    const found = users.find((u) => String(u?.nombre || '').toLowerCase().includes(byName) || String(u?.username || '').toLowerCase().includes(byName))
+    return String(found?.username || '').toLowerCase()
+  }
+
+  async function ensureCarpetaForTarget() {
+    const target = resolveTargetUsername()
+    if (!target) {
+      setToast({ msg: 'Indica username o nombre para ubicar el usuario', ok: false })
+      return
+    }
+    try {
+      const data = await getCarpetaByUsername(target)
+      setCarpetaPreview({ username: target, ...data })
+      setToast({ msg: `Carpeta lista para ${target}`, ok: true })
+    } catch (e: any) {
+      setToast({ msg: e.message || 'No se pudo abrir/crear carpeta', ok: false })
+    }
+  }
+
+  async function createCarpetaThreadForTarget() {
+    const target = resolveTargetUsername()
+    if (!target) {
+      setToast({ msg: 'Indica username o nombre para ubicar el usuario', ok: false })
+      return
+    }
+    if (!carpetaThreadTitle.trim()) {
+      setToast({ msg: 'El título del hilo es requerido', ok: false })
+      return
+    }
+    const participantes = carpetaThreadParticipants
+      .split(',')
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean)
+    try {
+      await crearHiloCarpeta({ titulo: carpetaThreadTitle.trim(), descripcion: carpetaThreadDesc.trim(), participantes }, target)
+      setToast({ msg: `Hilo creado en carpeta de ${target}`, ok: true })
+      setCarpetaThreadTitle('')
+      setCarpetaThreadDesc('')
+      setCarpetaThreadParticipants('')
+      const data = await getCarpetaByUsername(target)
+      setCarpetaPreview({ username: target, ...data })
+    } catch (e: any) {
+      setToast({ msg: e.message || 'No se pudo crear el hilo', ok: false })
     }
   }
 
@@ -521,10 +582,28 @@ export default function AdminPage() {
     return true
   }), [invites, filtro])
 
+  const filteredUsers = useMemo(() => {
+    const q = usersSearch.trim().toLowerCase()
+    if (!q) return users
+    return users.filter((u) => {
+      const fields = [
+        u.username,
+        u.nombre,
+        u.callsign,
+        u.discordId,
+        u.agentNumber,
+        u.rol,
+        ...(Array.isArray(u.clases) ? u.clases : []),
+      ].map((v) => String(v || '').toLowerCase())
+      return fields.some((v) => v.includes(q))
+    })
+  }, [users, usersSearch])
+
   const TABS = [
     { id: 'invites' as Tab, icon: Key, label: 'Invitaciones' },
     { id: 'users' as Tab, icon: Users, label: 'Usuarios' },
     { id: 'callsigns' as Tab, icon: Shield, label: 'Callsigns' },
+    { id: 'carpetas' as Tab, icon: ClipboardList, label: 'Carpetas' },
     { id: 'forms' as Tab, icon: ClipboardList, label: 'Formularios' },
     { id: 'website' as Tab, icon: Globe, label: 'Website' },
   ]
@@ -616,12 +695,15 @@ export default function AdminPage() {
         <div className="card overflow-x-auto">
           <div className="flex items-center justify-between px-4 py-3 border-b border-bg-border">
             <span className="section-tag">// Cuentas de la Plataforma</span>
-            <button onClick={loadUsers} className="text-tx-muted hover:text-tx-primary"><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /></button>
+            <div className="flex items-center gap-2">
+              <input className="input text-xs py-1.5 w-52" placeholder="Buscar registrados..." value={usersSearch} onChange={(e) => setUsersSearch(e.target.value)} />
+              <button onClick={loadUsers} className="text-tx-muted hover:text-tx-primary"><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /></button>
+            </div>
           </div>
           <table className="w-full">
             <thead><tr className="border-b border-bg-border">{(isCS ? ['Usuario', 'Nombre IC', 'Rol', 'Clases', 'Callsign', 'N° Agente', 'Discord', 'Estado', ''] : ['Usuario', 'Rol', 'Clases', 'Estado']).map((h) => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody>
-              {users.map((u) => {
+              {filteredUsers.map((u) => {
                 const editing = !!userEdit[u.id]
                 const draft = userEdit[u.id] || {}
                 return (
@@ -659,6 +741,62 @@ export default function AdminPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === 'carpetas' && (
+        <div className="space-y-4">
+          <div className="card p-4">
+            <span className="section-tag mb-3 block">// Crear / Gestionar carpeta por usuario</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="label">Username</label>
+                <input className="input text-xs py-2" value={carpetaTargetUsername} onChange={(e) => setCarpetaTargetUsername(e.target.value)} placeholder="usuario" />
+              </div>
+              <div>
+                <label className="label">Nombre (búsqueda)</label>
+                <input className="input text-xs py-2" value={carpetaTargetName} onChange={(e) => setCarpetaTargetName(e.target.value)} placeholder="Juan García" />
+              </div>
+              <div className="flex items-end">
+                <button className="btn-primary w-full" onClick={ensureCarpetaForTarget}>Crear / Abrir carpeta</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-4">
+            <span className="section-tag mb-3 block">// Crear hilo en carpeta</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Título</label>
+                <input className="input text-xs py-2" value={carpetaThreadTitle} onChange={(e) => setCarpetaThreadTitle(e.target.value)} placeholder="Incidencia RRHH" />
+              </div>
+              <div>
+                <label className="label">Participantes (comma-separated usernames)</label>
+                <input className="input text-xs py-2" value={carpetaThreadParticipants} onChange={(e) => setCarpetaThreadParticipants(e.target.value)} placeholder="indra,agente1" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Descripción</label>
+                <textarea className="input text-xs py-2 min-h-[90px]" value={carpetaThreadDesc} onChange={(e) => setCarpetaThreadDesc(e.target.value)} placeholder="Detalle del hilo..." />
+              </div>
+            </div>
+            <div className="mt-3">
+              <button className="btn-primary" onClick={createCarpetaThreadForTarget}>Crear hilo</button>
+            </div>
+          </div>
+
+          <div className="card p-4">
+            <span className="section-tag mb-2 block">// Vista rápida de carpeta</span>
+            {carpetaPreview ? (
+              <div className="text-xs text-tx-secondary space-y-1">
+                <p><strong className="text-tx-primary">Usuario:</strong> {carpetaPreview.username || '—'}</p>
+                <p><strong className="text-tx-primary">Anotaciones:</strong> {Array.isArray(carpetaPreview.anotaciones) ? carpetaPreview.anotaciones.length : 0}</p>
+                <p><strong className="text-tx-primary">Documentos:</strong> {Array.isArray(carpetaPreview.documentos) ? carpetaPreview.documentos.length : 0}</p>
+                <p><strong className="text-tx-primary">Hilos:</strong> {Array.isArray(carpetaPreview.hilos) ? carpetaPreview.hilos.length : 0}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-tx-muted">No hay carpeta cargada aún.</p>
+            )}
+          </div>
         </div>
       )}
 

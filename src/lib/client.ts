@@ -46,7 +46,7 @@ export const crearInvite  = (b:any) => api<any>('/invite',{method:'POST',body:JS
 export const borrarInvite = (codigo:string) => api<any>('/invite',{method:'DELETE',body:JSON.stringify({codigo})})
 
 // Users
-export const getUsers   = () => api<any>('/users')
+export const getUsers   = (p?:Record<string,string>) => api<any>('/users'+(p?'?'+new URLSearchParams(p):''))
 export const editarUser = (id:string,b:any) => api<any>(`/users/${id}`,{method:'PATCH',body:JSON.stringify(b)})
 export const borrarUser = (id:string) => api<any>(`/users/${id}`,{method:'DELETE'})
 
@@ -91,6 +91,7 @@ export const crearChatPrivado = (nombre:string, participantes:string[], descripc
 
 // Carpeta
 export const getCarpeta        = () => api<any>('/carpeta')
+export const getCarpetaByUsername = (username:string) => api<any>(`/carpeta?username=${encodeURIComponent(username)}`)
 export const crearAnotacion    = (b:any) => api<any>('/carpeta',{method:'POST',body:JSON.stringify({tipo:'anotacion',...b})})
 export const borrarCarpetaItem = (tipo:string,id:string) => api<any>('/carpeta',{method:'DELETE',body:JSON.stringify({tipo,id})})
 export const crearHiloCarpeta  = (b:any, username?:string) => api<any>(`/carpeta${username ? `?username=${encodeURIComponent(username)}` : ''}`,{method:'POST',body:JSON.stringify({tipo:'hilo',...b})})
