@@ -1200,6 +1200,138 @@ export default function AdminPage() {
                   <textarea className="input min-h-28" value={Array.isArray(websiteConfig.comunicadosInfo?.items) ? websiteConfig.comunicadosInfo.items.map((it: any) => `${it.estado || 'activo'}|${it.titulo || ''}|${it.detalle || ''}|${it.enlace || ''}`).join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, comunicadosInfo: { ...(p.comunicadosInfo || {}), items: e.target.value.split('\n').map((line, idx) => { const [estado = 'activo', titulo = '', detalle = '', enlace = ''] = line.split('|'); return { id: `com-${idx + 1}`, estado: estado.trim(), titulo: titulo.trim(), detalle: detalle.trim(), enlace: enlace.trim(), fecha: new Date().toISOString() } }).filter((x) => x.titulo) } }))} />
                 </div>
               </div>
+
+              {/* FAQ */}
+              <div className="card p-5 flex flex-col gap-4 border-cyan-700/30">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="section-tag">// FAQ — Preguntas Frecuentes</span>
+                  <button
+                    className="btn-ghost text-[9px] py-1.5"
+                    onClick={() => setWebsiteConfig((p: any) => ({
+                      ...p,
+                      faqInfo: {
+                        ...(p.faqInfo || {}),
+                        items: [
+                          ...(Array.isArray(p.faqInfo?.items) ? p.faqInfo.items : []),
+                          { id: `faq-${Date.now()}`, pregunta: '', respuesta: '' },
+                        ],
+                      },
+                    }))}
+                  >
+                    + Agregar pregunta
+                  </button>
+                </div>
+                <div>
+                  <label className="label">Título de la sección</label>
+                  <input
+                    className="input"
+                    value={websiteConfig.faqInfo?.titulo || ''}
+                    placeholder="Preguntas Frecuentes"
+                    onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, faqInfo: { ...(p.faqInfo || {}), titulo: e.target.value } }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Descripción (opcional)</label>
+                  <input
+                    className="input"
+                    value={websiteConfig.faqInfo?.descripcion || ''}
+                    onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, faqInfo: { ...(p.faqInfo || {}), descripcion: e.target.value } }))}
+                  />
+                </div>
+                {Array.isArray(websiteConfig.faqInfo?.items) && websiteConfig.faqInfo.items.map((item: any, idx: number) => (
+                  <div key={item.id || idx} className="border border-bg-border bg-bg-surface p-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-mono text-[9px] text-tx-muted uppercase tracking-widest">Pregunta {idx + 1}</span>
+                      <button
+                        className="font-mono text-[9px] text-red-400 hover:text-red-300"
+                        onClick={() => setWebsiteConfig((p: any) => ({
+                          ...p,
+                          faqInfo: {
+                            ...(p.faqInfo || {}),
+                            items: p.faqInfo.items.filter((_: any, i: number) => i !== idx),
+                          },
+                        }))}
+                      >
+                        ✕ Quitar
+                      </button>
+                    </div>
+                    <input
+                      className="input text-xs py-2"
+                      placeholder="Pregunta (ej. ¿Cómo me uno a la FIB?)"
+                      value={item.pregunta || ''}
+                      onChange={(e) => setWebsiteConfig((p: any) => {
+                        const items = [...(p.faqInfo?.items || [])]
+                        items[idx] = { ...items[idx], pregunta: e.target.value }
+                        return { ...p, faqInfo: { ...(p.faqInfo || {}), items } }
+                      })}
+                    />
+                    <textarea
+                      className="input text-xs min-h-16"
+                      placeholder="Respuesta..."
+                      value={item.respuesta || ''}
+                      onChange={(e) => setWebsiteConfig((p: any) => {
+                        const items = [...(p.faqInfo?.items || [])]
+                        items[idx] = { ...items[idx], respuesta: e.target.value }
+                        return { ...p, faqInfo: { ...(p.faqInfo || {}), items } }
+                      })}
+                    />
+                  </div>
+                ))}
+                {(!Array.isArray(websiteConfig.faqInfo?.items) || websiteConfig.faqInfo.items.length === 0) && (
+                  <p className="font-mono text-[9px] text-tx-muted">Sin preguntas. Haz clic en "+ Agregar pregunta".</p>
+                )}
+              </div>
+
+              {/* Organigrama */}
+              <div className="card p-5 flex flex-col gap-4 border-cyan-700/30">
+                <span className="section-tag">// Organigrama</span>
+                <div>
+                  <label className="label">Título de la sección</label>
+                  <input
+                    className="input"
+                    placeholder="Organigrama"
+                    value={websiteConfig.organigramaInfo?.titulo || ''}
+                    onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, organigramaInfo: { ...(p.organigramaInfo || {}), titulo: e.target.value } }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Descripción (opcional)</label>
+                  <input
+                    className="input"
+                    value={websiteConfig.organigramaInfo?.descripcion || ''}
+                    onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, organigramaInfo: { ...(p.organigramaInfo || {}), descripcion: e.target.value } }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">URL de la imagen del organigrama</label>
+                  <input
+                    className="input text-xs py-2"
+                    placeholder="https://i.imgur.com/... (recomendado: PNG o JPG en alta resolución)"
+                    value={websiteConfig.organigramaInfo?.imageUrl || ''}
+                    onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, organigramaInfo: { ...(p.organigramaInfo || {}), imageUrl: e.target.value } }))}
+                  />
+                  <p className="font-mono text-[8px] text-tx-dim mt-1">Para máxima calidad usa Imgur (Direct Link), Google Drive (acceso público) o cualquier CDN de imágenes.</p>
+                </div>
+                {websiteConfig.organigramaInfo?.imageUrl && (
+                  <div className="border border-bg-border bg-bg-surface overflow-hidden">
+                    <p className="font-mono text-[9px] text-tx-muted tracking-widest uppercase px-3 py-2 border-b border-bg-border">Vista previa</p>
+                    <img
+                      src={websiteConfig.organigramaInfo.imageUrl}
+                      alt="Organigrama preview"
+                      className="w-full object-contain"
+                      style={{ maxHeight: '360px' }}
+                    />
+                    <a
+                      href={websiteConfig.organigramaInfo.imageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-center font-mono text-[9px] text-accent-blue py-2 hover:underline border-t border-bg-border"
+                    >
+                      ↗ Ver imagen completa en nueva pestaña
+                    </a>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

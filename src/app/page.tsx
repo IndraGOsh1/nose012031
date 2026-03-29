@@ -103,6 +103,16 @@ type LandingConfig = {
       fecha?: string
     }>
   }
+  faqInfo?: {
+    titulo?: string
+    descripcion?: string
+    items?: Array<{ id?: string; pregunta?: string; respuesta?: string }>
+  }
+  organigramaInfo?: {
+    titulo?: string
+    imageUrl?: string
+    descripcion?: string
+  }
 }
 
 type OposicionPost = {
@@ -126,9 +136,38 @@ function Ticker() {
   )
 }
 
+function FaqAccordion({ items, cardStyle }: { items: Array<{id?:string;pregunta?:string;respuesta?:string}>; cardStyle: CSSProperties }) {
+  const [open, setOpen] = useState<string|null>(null)
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((item, idx) => {
+        const id = item.id || `faq-${idx}`
+        const isOpen = open === id
+        return (
+          <div key={id} className="card overflow-hidden" style={cardStyle}>
+            <button
+              onClick={() => setOpen(isOpen ? null : id)}
+              className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-bg-hover transition-colors"
+            >
+              <span className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary leading-snug pr-4">{item.pregunta}</span>
+              <span className={`font-mono text-lg text-accent-blue transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>›</span>
+            </button>
+            {isOpen && (
+              <div className="px-5 pb-4 border-t border-bg-border">
+                <p className="text-sm text-tx-secondary leading-relaxed mt-3 whitespace-pre-wrap">{item.respuesta}</p>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Home() {
   const [config, setConfig] = useState<LandingConfig>({})
   const [oposPosts, setOposPosts] = useState<OposicionPost[]>([])
+  const [organigramaOpen, setOrganigramaOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/config-visual', { cache:'no-store' })
@@ -189,6 +228,9 @@ export default function Home() {
   const heroSubtitle = config.textoSubhero || 'Sistema centralizado de gestión operativa'
   const comunicados = config.comunicadosInfo || {}
   const comunicadosItems = Array.isArray(comunicados.items) ? comunicados.items : []
+  const faqInfo = config.faqInfo || {}
+  const faqItems = Array.isArray(faqInfo.items) ? faqInfo.items.filter((i: any) => i.pregunta) : []
+  const organigramaInfo = config.organigramaInfo || {}
   const formSteps = Array.isArray(oposInfo.formularioPasos) ? oposInfo.formularioPasos : []
 
   return (
@@ -204,7 +246,11 @@ export default function Home() {
             </div>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            {['unidades','rangos','mision','oposiciones'].map(s => (
+            {[
+              'unidades','rangos',
+              ...(organigramaInfo.imageUrl ? ['organigrama'] : []),
+              'faq','oposiciones'
+            ].map(s => (
               <a key={s} href={`#${s}`} className="font-display text-[10px] tracking-widest uppercase text-tx-muted hover:text-tx-primary transition-colors">{s}</a>
             ))}
           </div>
@@ -326,6 +372,69 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Organigrama */}
+      {organigramaInfo.imageUrl && (
+        <section id="organigrama" className="px-6 bg-bg-surface/40" style={{ paddingTop: sectionPadding, paddingBottom: sectionPadding }}>
+          <div className="mx-auto" style={maxWidthStyle}>
+            <div className="mb-8">
+              <span className="section-tag">// Estructura Organizacional</span>
+              <div className="divider" />
+              <h2 className="font-display text-3xl font-semibold tracking-wider uppercase text-tx-primary">{organigramaInfo.titulo || 'Organigrama'}</h2>
+              {organigramaInfo.descripcion && <p className="text-sm text-tx-secondary mt-2">{organigramaInfo.descripcion}</p>}
+            </div>
+            <div
+              className="card overflow-hidden cursor-zoom-in group"
+              style={cardStyle}
+              onClick={() => setOrganigramaOpen(true)}
+            >
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent-blue/50 to-transparent" />
+              <img
+                src={organigramaInfo.imageUrl}
+                alt="Organigrama"
+                className="w-full object-contain group-hover:opacity-90 transition-opacity duration-300"
+                style={{ maxHeight: '520px' }}
+              />
+              <div className="flex items-center justify-between px-4 py-2.5 border-t border-bg-border bg-bg-surface">
+                <p className="font-mono text-[9px] text-tx-muted tracking-widest uppercase">Organigrama Institucional</p>
+                <span className="font-mono text-[9px] text-accent-blue tracking-widest">⤢ Ver en alta resolución</span>
+              </div>
+            </div>
+          </div>
+          {/* Lightbox */}
+          {organigramaOpen && (
+            <div
+              className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4"
+              onClick={() => setOrganigramaOpen(false)}
+            >
+              <div className="absolute top-4 right-4 flex items-center gap-3">
+                <a
+                  href={organigramaInfo.imageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-[9px] tracking-widest uppercase text-accent-blue border border-accent-blue/40 px-3 py-1.5 hover:bg-accent-blue/10 transition-colors"
+                  onClick={e => e.stopPropagation()}
+                >
+                  ↗ Abrir original
+                </a>
+                <button
+                  className="font-mono text-[9px] tracking-widest uppercase text-white border border-white/20 px-3 py-1.5 hover:bg-white/10 transition-colors"
+                  onClick={() => setOrganigramaOpen(false)}
+                >
+                  ✕ Cerrar
+                </button>
+              </div>
+              <img
+                src={organigramaInfo.imageUrl}
+                alt="Organigrama"
+                className="max-w-full max-h-[90vh] object-contain"
+                style={{ imageRendering: 'auto' }}
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Mission + Oposiciones */}
       <section id="mision" className="px-6" style={{ paddingTop: sectionPadding, paddingBottom: sectionPadding }}>
         <div className="mx-auto grid md:grid-cols-2 gap-8 items-start" style={maxWidthStyle}>
@@ -344,6 +453,19 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* FAQ */}
+        {faqItems.length > 0 && (
+          <div id="faq" className="mx-auto mt-8" style={maxWidthStyle}>
+            <div className="mb-6">
+              <span className="section-tag">// FAQ</span>
+              <div className="divider" />
+              <h2 className="font-display text-3xl font-semibold tracking-wider uppercase text-tx-primary">{faqInfo.titulo || 'Preguntas Frecuentes'}</h2>
+              {faqInfo.descripcion && <p className="text-sm text-tx-secondary mt-2">{faqInfo.descripcion}</p>}
+            </div>
+            <FaqAccordion items={faqItems} cardStyle={cardStyle} />
+          </div>
+        )}
 
         <div id="oposiciones" className="mx-auto mt-8 grid md:grid-cols-2 gap-8" style={maxWidthStyle}>
           <div className="card p-6" style={cardStyle}>

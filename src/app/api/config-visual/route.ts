@@ -66,6 +66,34 @@ function sanitizeComunicadosInfo(raw: any) {
   }
 }
 
+function sanitizeFaqInfo(raw: any) {
+  const source = raw && typeof raw === 'object' ? raw : {}
+  const items = Array.isArray(source.items)
+    ? source.items
+      .map((it: any, idx: number) => ({
+        id: String(it?.id || `faq-${idx + 1}`).trim().slice(0, 40),
+        pregunta: String(it?.pregunta || '').trim().slice(0, 300),
+        respuesta: String(it?.respuesta || '').trim().slice(0, 2000),
+      }))
+      .filter((x: any) => x.pregunta)
+      .slice(0, 20)
+    : []
+  return {
+    titulo: String(source.titulo || 'Preguntas Frecuentes').trim().slice(0, 120),
+    descripcion: String(source.descripcion || '').trim().slice(0, 600),
+    items,
+  }
+}
+
+function sanitizeOrganigramaInfo(raw: any) {
+  const source = raw && typeof raw === 'object' ? raw : {}
+  return {
+    titulo: String(source.titulo || 'Organigrama').trim().slice(0, 120),
+    imageUrl: String(source.imageUrl || '').trim().slice(0, 2000),
+    descripcion: String(source.descripcion || '').trim().slice(0, 600),
+  }
+}
+
 function clampNumber(v: any, min: number, max: number, fallback: number) {
   const n = Number(v)
   if (!Number.isFinite(n)) return fallback
@@ -109,6 +137,14 @@ export async function PATCH(req: NextRequest) {
 
   if (next.comunicadosInfo !== undefined) {
     next.comunicadosInfo = sanitizeComunicadosInfo(next.comunicadosInfo)
+  }
+
+  if (next.faqInfo !== undefined) {
+    next.faqInfo = sanitizeFaqInfo(next.faqInfo)
+  }
+
+  if (next.organigramaInfo !== undefined) {
+    next.organigramaInfo = sanitizeOrganigramaInfo(next.organigramaInfo)
   }
 
   if (next.websiteSettings !== undefined) {

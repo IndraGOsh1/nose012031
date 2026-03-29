@@ -54,6 +54,16 @@ export interface ConfigVisual {
     oposicionesImageHeight: number
   }
   divisionesInfo:     { nombre:string; descripcion:string; logoUrl:string }[]
+  faqInfo: {
+    titulo: string
+    descripcion: string
+    items: Array<{ id: string; pregunta: string; respuesta: string }>
+  }
+  organigramaInfo: {
+    titulo: string
+    imageUrl: string
+    descripcion: string
+  }
   indraRecoveryUsedAt: string | null
   actualizadoPor:     string
   actualizadoEn:      string
@@ -121,6 +131,16 @@ const DEFAULT: ConfigVisual = {
     { nombre:'ERT',  descripcion:'Evidence Response Team',           logoUrl:'https://i.imgur.com/IemqOQh.png' },
     { nombre:'RRHH', descripcion:'Recursos Humanos',                 logoUrl:'https://i.imgur.com/z5NiemF.png' },
   ],
+  faqInfo: {
+    titulo: 'Preguntas Frecuentes',
+    descripcion: '',
+    items: [],
+  },
+  organigramaInfo: {
+    titulo: 'Organigrama',
+    imageUrl: '',
+    descripcion: 'Estructura organizacional de la División Federal.',
+  },
   indraRecoveryUsedAt: null,
   actualizadoPor:'SYSTEM', actualizadoEn:new Date().toISOString(),
 }
