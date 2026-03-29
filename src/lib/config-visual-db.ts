@@ -149,17 +149,20 @@ const DEFAULT: ConfigVisual = {
 import { createClient } from '@supabase/supabase-js'
 import { getSecret } from './secrets'
 
-const isSupabaseEnabled = !!(getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)
+const supabaseUrl = getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseKey = (
+  getSecret('SUPABASE_SERVICE_ROLE_KEY') ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
+const isSupabaseEnabled = !!(supabaseUrl && supabaseKey)
 const ROW_KEY = 'singleton'
 
 function getSupabase() {
-  const url = (getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)!
-  const key = (
-    getSecret('SUPABASE_SERVICE_ROLE_KEY') ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )!
-  return createClient(url, key)
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase no está configurado para ConfigVisualDB')
+  }
+  return createClient(supabaseUrl, supabaseKey)
 }
 
 declare global { var __fibConfigVisual2: ConfigVisual | undefined }
@@ -264,12 +267,28 @@ export const ConfigVisualDB = {
   },
   set: async (d: Partial<ConfigVisual>) => {
     await global.__fibConfigVisualInit
-    global.__fibConfigVisual2 = { ...global.__fibConfigVisual2!, ...d, actualizadoEn: new Date().toISOString() }
-    if (isSupabaseEnabled) await saveToSupabase(global.__fibConfigVisual2)
+    const next = { ...global.__fibConfigVisual2!, ...d, actualizadoEn: new Date().toISOString() }
+    if (!isSupabaseEnabled) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Persistencia deshabilitada: faltan variables de Supabase para guardar config_visual')
+      }
+      global.__fibConfigVisual2 = next
+      return
+    }
+    await saveToSupabase(next)
+    global.__fibConfigVisual2 = next
   },
   reset: async () => {
     await global.__fibConfigVisualInit
-    global.__fibConfigVisual2 = { ...DEFAULT }
-    if (isSupabaseEnabled) await saveToSupabase(global.__fibConfigVisual2)
+    const next = { ...DEFAULT }
+    if (!isSupabaseEnabled) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Persistencia deshabilitada: faltan variables de Supabase para resetear config_visual')
+      }
+      global.__fibConfigVisual2 = next
+      return
+    }
+    await saveToSupabase(next)
+    global.__fibConfigVisual2 = next
   },
 }

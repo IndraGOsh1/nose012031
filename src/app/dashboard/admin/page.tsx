@@ -917,7 +917,11 @@ export default function AdminPage() {
                 return (
                   <div className="mt-2">
                     <a href={google.openUrl} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-blue hover:underline">Abrir formulario actual en nueva pestaña</a>
-                    <iframe title="Google Form Preview (admin)" src={google.embedUrl} className="w-full h-[260px] border border-bg-border bg-black mt-2" loading="lazy" />
+                    {google.embedUrl ? (
+                      <iframe title="Google Form Preview (admin)" src={google.embedUrl} className="w-full h-[260px] border border-bg-border bg-black mt-2" loading="lazy" />
+                    ) : (
+                      <p className="font-mono text-[9px] text-tx-muted mt-2">El enlace guardado abre correctamente, pero no provee vista embebida. Usa URL de docs.google.com/forms/... para preview interna.</p>
+                    )}
                   </div>
                 )
               })()}

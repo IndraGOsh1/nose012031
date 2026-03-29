@@ -6,19 +6,26 @@ export function sanitizeGoogleFormRef(raw: any): string {
   const value = String(raw || '').trim()
   if (!value) return ''
 
+  if (value.startsWith('d:') || value.startsWith('e:') || value.startsWith('url:')) {
+    return value.slice(0, 2000)
+  }
+
   if (/^https?:\/\//i.test(value)) {
     try {
       const url = new URL(value)
-      if (!/docs\.google\.com$/i.test(url.hostname)) return cleanToken(value)
+      if (/^forms\.gle$/i.test(url.hostname)) {
+        return `url:${value.slice(0, 2000)}`
+      }
+      if (!/docs\.google\.com$/i.test(url.hostname)) return ''
       const match = url.pathname.match(/\/forms\/d(?:\/e)?\/([a-zA-Z0-9_-]+)/i)
-      if (!match?.[1]) return value.slice(0, 2000)
+      if (!match?.[1]) return ''
       const token = cleanToken(match[1])
       if (url.pathname.includes('/d/e/')) {
         return `e:${token}`
       }
       return `d:${token}`
     } catch {
-      return cleanToken(value)
+      return ''
     }
   }
 
@@ -30,6 +37,16 @@ export function sanitizeGoogleFormRef(raw: any): string {
 export function buildGoogleFormUrls(raw: any) {
   const ref = sanitizeGoogleFormRef(raw)
   if (!ref) return { ref: '', embedUrl: '', openUrl: '', mode: 'none' as const }
+
+  if (ref.startsWith('url:')) {
+    const openUrl = ref.slice(4)
+    return {
+      ref,
+      embedUrl: '',
+      openUrl,
+      mode: 'url' as const,
+    }
+  }
 
   if (ref.startsWith('e:')) {
     const id = ref.slice(2)
