@@ -1171,17 +1171,17 @@ export default function AdminPage() {
 
                 <div>
                   <label className="label">Pasos (uno por línea)</label>
-                  <textarea className="input min-h-20" value={Array.isArray(websiteConfig.oposicionesInfo?.formularioPasos) ? websiteConfig.oposicionesInfo.formularioPasos.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), formularioPasos: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) } }))} />
+                  <textarea className="input min-h-20" value={Array.isArray(websiteConfig.oposicionesInfo?.formularioPasos) ? websiteConfig.oposicionesInfo.formularioPasos.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), formularioPasos: e.target.value.split('\n') } }))} />
                 </div>
 
                 <div>
                   <label className="label">Datos clave (uno por línea)</label>
-                  <textarea className="input min-h-24" value={Array.isArray(websiteConfig.oposicionesInfo?.datos) ? websiteConfig.oposicionesInfo.datos.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), datos: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) } }))} />
+                  <textarea className="input min-h-24" value={Array.isArray(websiteConfig.oposicionesInfo?.datos) ? websiteConfig.oposicionesInfo.datos.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), datos: e.target.value.split('\n') } }))} />
                 </div>
 
                 <div>
                   <label className="label">Imágenes de oposiciones (una por línea)</label>
-                  <textarea className="input min-h-24" value={Array.isArray(websiteConfig.oposicionesInfo?.imagenes) ? websiteConfig.oposicionesInfo.imagenes.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), imagenes: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) } }))} />
+                  <textarea className="input min-h-24" value={Array.isArray(websiteConfig.oposicionesInfo?.imagenes) ? websiteConfig.oposicionesInfo.imagenes.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), imagenes: e.target.value.split('\n') } }))} />
                 </div>
               </div>
 
