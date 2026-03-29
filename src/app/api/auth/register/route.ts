@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
 import { findInviteByCode, getDB, listUsersFresh, persistUserAndInvite } from '@/lib/db'
 import { SESSION_MAX_AGE_SECONDS, signToken, err } from '@/lib/auth'
+import { cacheMapSet } from '@/lib/supabase-map'
 import { logRegister } from '@/lib/webhook'
 import { getRequestIp, isStrongEnoughPassword, rateLimit } from '@/lib/security'
 import { getCarpeta } from '@/lib/carpeta-db'
@@ -53,8 +54,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     await persistUserAndInvite(user, nextInvite)
-    db.users.set(id, user)
-    db.invites.set(nextInvite.codigo, nextInvite)
+    cacheMapSet(db.users, id, user)
+    cacheMapSet(db.invites, nextInvite.codigo, nextInvite)
     await getCarpeta(user.username)
   } catch {
     return err('No se pudo completar el registro en este momento. Reintenta.', 503)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { getUser, unauthorized, forbidden, err } from '@/lib/auth'
 import { deleteInviteByCode, getDB, listInvitesFresh, persistInvite, type Rol } from '@/lib/db'
+import { cacheMapDelete, cacheMapSet } from '@/lib/supabase-map'
 import { logInviteCodes } from '@/lib/webhook'
 import { getRequestIp, rateLimit } from '@/lib/security'
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return err('No se pudo persistir el codigo en base de datos. Reintenta.', 503)
   }
-  db.invites.set(codigo, invite)
+  cacheMapSet(db.invites, codigo, invite)
   logInviteCodes('Creada', codigo, rol, u.username)
   return NextResponse.json({ mensaje:'✅ Código creado', codigo, rol, maxUsos:usos }, { status:201 })
 }
@@ -70,6 +71,6 @@ export async function DELETE(req: NextRequest) {
   } catch {
     return err('No se pudo eliminar el codigo en base de datos. Reintenta.', 503)
   }
-  db.invites.delete(code)
+  cacheMapDelete(db.invites, code)
   return NextResponse.json({ mensaje:'✅ Código eliminado' })
 }

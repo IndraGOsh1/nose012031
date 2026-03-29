@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSecret } from '@/lib/secrets'
 import { getRequestIp, rateLimit } from '@/lib/security'
 import { deleteInviteByCode, getDB, persistInvite, type Rol } from '@/lib/db'
+import { cacheMapDelete, cacheMapSet } from '@/lib/supabase-map'
 import { logInviteCodes } from '@/lib/webhook'
 import { err } from '@/lib/auth'
 
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     return err('No se pudo persistir el código. Reintenta.', 503)
   }
 
-  db.invites.set(codigo, invite)
+  cacheMapSet(db.invites, codigo, invite)
   logInviteCodes('Creada (bot)', codigo, rol, operator)
 
   // `key` is an alias for dashboard wording: both map to the same invite code.
@@ -113,7 +114,7 @@ export async function DELETE(req: NextRequest) {
   } catch {
     return err('No se pudo eliminar el código. Reintenta.', 503)
   }
-  db.invites.delete(codigo)
+  cacheMapDelete(db.invites, codigo)
 
   return NextResponse.json({ ok: true, codigo })
 }

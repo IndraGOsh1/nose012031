@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser, unauthorized, forbidden, notFound } from '@/lib/auth'
 import { deleteUserById, getDB, listUsersFresh, persistUser, type Rol } from '@/lib/db'
+import { cacheMapDelete, cacheMapSet } from '@/lib/supabase-map'
 import { logKeyAction, logRegistroImportante } from '@/lib/webhook'
 
 const ROLES: Rol[] = ['command_staff', 'supervisory', 'federal_agent', 'visitante']
@@ -66,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   } catch {
     return NextResponse.json({ error: 'No se pudo persistir el usuario en base de datos. Reintenta.' }, { status: 503 })
   }
-  db.users.set(id, nextUser)
+  cacheMapSet(db.users, id, nextUser)
   const { passwordHash:_, ...safe } = nextUser
   return NextResponse.json({ mensaje:'✅ Usuario actualizado', usuario:safe })
 }
@@ -89,6 +90,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   } catch {
     return NextResponse.json({ error: 'No se pudo eliminar el usuario en base de datos. Reintenta.' }, { status: 503 })
   }
-  db.users.delete(id)
+  cacheMapDelete(db.users, id)
   return NextResponse.json({ mensaje: '✅ Usuario eliminado' })
 }

@@ -154,6 +154,22 @@ export class SupabaseMap<K extends string, V extends Record<string, any>> {
     await this.writeQueue
   }
 
+  setCached(key: string, value: V): this {
+    this.cache.set(key, value)
+    return this
+  }
+
+  deleteCached(key: string): boolean {
+    return this.cache.delete(key)
+  }
+
+  hydrate(rows: Iterable<V>): this {
+    for (const row of rows) {
+      this.cache.set(String(row[this.pkField]), row)
+    }
+    return this
+  }
+
   set(key: string, value: V): this {
     this.cache.set(key, value)
     void this.enqueueWrite(() => this.upsertRemote(value)).catch((error) => {
@@ -192,6 +208,22 @@ export async function persistentMapSet<V extends Record<string, any>>(map: Map<s
 export async function persistentMapDelete<V extends Record<string, any>>(map: Map<string, V>, key: string) {
   if (map instanceof SupabaseMap) {
     return map.deletePersistent(key)
+  }
+  return map.delete(key)
+}
+
+export function cacheMapSet<V extends Record<string, any>>(map: Map<string, V>, key: string, value: V) {
+  if (map instanceof SupabaseMap) {
+    map.setCached(key, value)
+    return map
+  }
+  map.set(key, value)
+  return map
+}
+
+export function cacheMapDelete<V extends Record<string, any>>(map: Map<string, V>, key: string) {
+  if (map instanceof SupabaseMap) {
+    return map.deleteCached(key)
   }
   return map.delete(key)
 }

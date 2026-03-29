@@ -36,7 +36,7 @@ export interface Invite {
   usadoPor:    string[]
 }
 
-import { SupabaseMap } from './supabase-map'
+import { cacheMapDelete, cacheMapSet, SupabaseMap } from './supabase-map'
 import { createClient } from '@supabase/supabase-js'
 import { getSecret } from './secrets'
 
@@ -148,7 +148,7 @@ export async function listUsersFresh(): Promise<User[]> {
   if (error || !Array.isArray(data)) return fallback
 
   const rows = data as User[]
-  for (const row of rows) db.users.set(row.id, row)
+  for (const row of rows) cacheMapSet(db.users, row.id, row)
   return rows
 }
 
@@ -163,7 +163,7 @@ export async function listInvitesFresh(): Promise<Invite[]> {
   if (error || !Array.isArray(data)) return fallback
 
   const rows = data as Invite[]
-  for (const row of rows) db.invites.set(String(row.codigo || '').toUpperCase(), { ...row, codigo: String(row.codigo || '').toUpperCase() })
+  for (const row of rows) cacheMapSet(db.invites, String(row.codigo || '').toUpperCase(), { ...row, codigo: String(row.codigo || '').toUpperCase() })
   return rows.map((row) => ({ ...row, codigo: String(row.codigo || '').toUpperCase() }))
 }
 
@@ -183,7 +183,7 @@ export async function findInviteByCode(codigo: string): Promise<Invite | null> {
   if (error || !data) return null
 
   const invite = { ...(data as Invite), codigo: code }
-  db.invites.set(code, invite)
+  cacheMapSet(db.invites, code, invite)
   return invite
 }
 
