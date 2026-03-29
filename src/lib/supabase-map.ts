@@ -218,28 +218,15 @@ export class SupabaseMap<K extends string, V extends Record<string, any>> {
   }
 
   set(key: string, value: V): this {
-    this.cache.set(key, value)
-    void this.enqueueWrite(() => this.upsertRemote(value)).catch((error) => {
-      console.error(error instanceof Error ? error.message : `[SupabaseMap] upsert error on ${this.table}`)
-    })
-    return this
+    return this.setCached(key, value)
   }
 
   delete(key: string): boolean {
-    const existed = this.cache.delete(key)
-    if (existed) {
-      void this.enqueueWrite(() => this.deleteRemote(key)).catch((error) => {
-        console.error(error instanceof Error ? error.message : `[SupabaseMap] delete error on ${this.table}`)
-      })
-    }
-    return existed
+    return this.deleteCached(key)
   }
 
   clear(): void {
     this.cache.clear()
-    void this.enqueueWrite(() => this.clearRemote()).catch((error) => {
-      console.error(error instanceof Error ? error.message : `[SupabaseMap] clear error on ${this.table}`)
-    })
   }
 }
 
