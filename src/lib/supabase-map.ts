@@ -24,6 +24,44 @@ function getClient() {
   return _client
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isTransientNetworkError(error: unknown) {
+  if (!error) return false
+  const message = String((error as any)?.message || error).toLowerCase()
+  return (
+    message.includes('fetch failed') ||
+    message.includes('network') ||
+    message.includes('timed out') ||
+    message.includes('timeout') ||
+    message.includes('econnreset') ||
+    message.includes('enotfound') ||
+    message.includes('socket hang up')
+  )
+}
+
+async function withRetry<T>(run: () => Promise<T>, operation: string) {
+  const attempts = [0, 120, 300]
+  let lastError: unknown = null
+
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      if (attempts[i] > 0) await sleep(attempts[i])
+      return await run()
+    } catch (error) {
+      lastError = error
+      if (!isTransientNetworkError(error) || i === attempts.length - 1) {
+        throw error
+      }
+      console.warn(`[SupabaseMap] ${operation} retry ${i + 1}/${attempts.length - 1} due to transient network error`)
+    }
+  }
+
+  throw lastError
+}
+
 const strictPersistence = process.env.NODE_ENV === 'production' || process.env.REQUIRE_PERSISTENCE === '1'
 
 export class SupabaseMap<K extends string, V extends Record<string, any>> {
@@ -94,21 +132,30 @@ export class SupabaseMap<K extends string, V extends Record<string, any>> {
   private async upsertRemote(value: V) {
     const client = getClient()
     if (!client) return
-    const { error } = await (client.from(this.table) as any).upsert(value as any)
+    const { error } = await withRetry(
+      async () => (client.from(this.table) as any).upsert(value as any),
+      `upsert on ${this.table}`,
+    )
     if (error) throw new Error(`[SupabaseMap] upsert error on ${this.table}: ${error.message}`)
   }
 
   private async deleteRemote(key: string) {
     const client = getClient()
     if (!client) return
-    const { error } = await (client.from(this.table) as any).delete().eq(this.pkField, key)
+    const { error } = await withRetry(
+      async () => (client.from(this.table) as any).delete().eq(this.pkField, key),
+      `delete on ${this.table}`,
+    )
     if (error) throw new Error(`[SupabaseMap] delete error on ${this.table}: ${error.message}`)
   }
 
   private async clearRemote() {
     const client = getClient()
     if (!client) return
-    const { error } = await (client.from(this.table) as any).delete().neq(this.pkField, '')
+    const { error } = await withRetry(
+      async () => (client.from(this.table) as any).delete().neq(this.pkField, ''),
+      `clear on ${this.table}`,
+    )
     if (error) throw new Error(`[SupabaseMap] clear error on ${this.table}: ${error.message}`)
   }
 
