@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Plus, X, CheckCircle, AlertCircle, Send, ChevronRight, Tag, Clock, User } from 'lucide-react'
-import { getTickets, getTicket, crearTicket, editarTicket, borrarTicket } from '@/lib/client'
+import { getTickets, getTicket, getStoredUser, crearTicket, editarTicket, borrarTicket, subscribeStoredUser } from '@/lib/client'
 import { Toast, ToastType } from '@/components/Toast'
 import { TableSkeleton } from '@/components/Skeleton'
 
@@ -202,7 +202,10 @@ export default function TicketsPage() {
   const [form,    setForm]    = useState({ titulo:'', descripcion:'', tipo:'solicitud', prioridad:'media' })
   const [creating,setCreating]= useState(false)
 
-  useEffect(() => { const u = localStorage.getItem('fib_user'); if (u) setUser(JSON.parse(u)) }, [])
+  useEffect(() => {
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)

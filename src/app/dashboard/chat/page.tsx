@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Send, Hash, MessageSquare, Plus, User, Lock, Star, Crown, Image as ImageIcon, ChevronDown, Music, VolumeX, Volume2 } from 'lucide-react'
-import { getCanales, getMensajes, enviarMensaje, crearDM, crearChatPrivado } from '@/lib/client'
+import { getCanales, getMensajes, getStoredUser, enviarMensaje, crearDM, crearChatPrivado, subscribeStoredUser } from '@/lib/client'
 import { uiAlert, uiPrompt } from '@/lib/ui-dialog'
 
 function timeLabel(iso: string) {
@@ -52,12 +52,13 @@ export default function ChatPage() {
   const isAtBottomRef = useRef(true)
 
   useEffect(() => {
-    const u = localStorage.getItem('fib_user')
-    if (u) setUser(JSON.parse(u))
+    setUser(getStoredUser())
+    const unsubscribe = subscribeStoredUser(setUser)
     // init audio
     audioRef.current = new Audio()
     audioRef.current.loop = true
     audioRef.current.volume = 0.15
+    return () => unsubscribe()
   }, [])
 
   const loadCanales = useCallback(async () => {

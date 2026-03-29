@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Save, RefreshCw, CheckCircle, AlertCircle, RotateCcw, Palette, Image, Type, Bell, Key, Globe } from 'lucide-react'
-import { getConfigVisual, setConfigVisual, resetConfigVisual, getInvites, crearInvite, borrarInvite } from '@/lib/client'
+import { getConfigVisual, getStoredUser, setConfigVisual, resetConfigVisual, getInvites, crearInvite, borrarInvite, subscribeStoredUser } from '@/lib/client'
 import { buildGoogleFormUrls } from '@/lib/google-forms'
 import { uiConfirm } from '@/lib/ui-dialog'
 
@@ -40,7 +40,10 @@ export default function ConfigPage() {
   const isCS    = user?.rol === 'command_staff'
   const isSuperv= ['command_staff','supervisory'].includes(user?.rol)
 
-  useEffect(()=>{ const u=localStorage.getItem('fib_user'); if(u) setUser(JSON.parse(u)) },[])
+  useEffect(() => {
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
+  }, [])
   useEffect(()=>{
     getConfigVisual().then(c=>{ setConfigS(c); setLoading(false) }).catch(()=>setLoading(false))
   },[])

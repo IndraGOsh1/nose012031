@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser, unauthorized, forbidden, notFound } from '@/lib/auth'
-import { deleteUserById, getDB, persistUser, type Rol } from '@/lib/db'
+import { deleteUserById, getDB, listUsersFresh, persistUser, type Rol } from '@/lib/db'
 import { logKeyAction, logRegistroImportante } from '@/lib/webhook'
 
 const ROLES: Rol[] = ['command_staff', 'supervisory', 'federal_agent', 'visitante']
@@ -10,6 +10,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const u = getUser(req); if (!u) return unauthorized()
   if (!['command_staff','supervisory'].includes(u.rol)) return forbidden()
   const { id } = await params
+  await listUsersFresh()
   const db = await getDB()
   const usr = db.users.get(id); if (!usr) return notFound('Usuario no encontrado')
   if (u.rol === 'supervisory' && usr.rol === 'command_staff') return forbidden()
@@ -75,6 +76,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (u.rol !== 'command_staff') return forbidden()
 
   const { id } = await params
+  await listUsersFresh()
   const db = await getDB()
   const usr = db.users.get(id); if (!usr) return notFound('Usuario no encontrado')
 

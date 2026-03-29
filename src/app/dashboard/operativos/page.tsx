@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Eye, Edit, Trash2, Check, ArchiveX, Clock, Image, Type, Minus, MoveUp, MoveDown } from 'lucide-react'
-import { getOperativos, crearOperativo, editarOperativo, borrarOperativo } from '@/lib/client'
+import { getOperativos, getStoredUser, crearOperativo, editarOperativo, borrarOperativo, subscribeStoredUser } from '@/lib/client'
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog'
 
 type EstadoOp = 'borrador' | 'pendiente' | 'publicado' | 'archivado'
@@ -356,7 +356,10 @@ export default function OperativosPage() {
   const [filtroUnidad, setFiltroUnidad] = useState('')
   const [tab, setTab] = useState<'todos'|'pendientes'>('todos')
 
-  useEffect(() => { const u = localStorage.getItem('fib_user'); if (u) setUser(JSON.parse(u)) }, [])
+  useEffect(() => {
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)

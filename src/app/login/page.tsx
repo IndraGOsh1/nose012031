@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Lock, User, Key, AlertCircle, ChevronRight, ArrowLeft } from 'lucide-react'
-import { login, register } from '@/lib/client'
+import { clearStoredSession, isSessionIdleExpired, login, markSessionActivity, register, setStoredUser } from '@/lib/client'
 
 type Mode = 'login' | 'register'
 
@@ -19,16 +19,20 @@ export default function LoginPage() {
     const checkExistingSession = async () => {
       const token = localStorage.getItem('fib_token')
       if (!token) return
+      if (isSessionIdleExpired()) {
+        clearStoredSession()
+        return
+      }
       try {
         const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
         if (!res.ok) throw new Error('unauthorized')
         const me = await res.json()
         if (!alive) return
-        localStorage.setItem('fib_user', JSON.stringify(me))
+        markSessionActivity()
+        setStoredUser(me)
         window.location.href = '/dashboard'
       } catch {
-        localStorage.removeItem('fib_token')
-        localStorage.removeItem('fib_user')
+        clearStoredSession()
       }
     }
 
@@ -39,13 +43,13 @@ export default function LoginPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(''); setLoading(true)
     try {
-      localStorage.removeItem('fib_token')
-      localStorage.removeItem('fib_user')
+      clearStoredSession()
       const d = mode === 'login'
         ? await login(form.username, form.password)
         : await register(form.username, form.password, form.codigo, form.nombre)
       localStorage.setItem('fib_token', d.token)
-      localStorage.setItem('fib_user',  JSON.stringify(d.usuario))
+      markSessionActivity()
+      setStoredUser(d.usuario)
       window.location.href = '/dashboard'
     } catch (err: any) { setError(err.message) }
     finally { setLoading(false) }

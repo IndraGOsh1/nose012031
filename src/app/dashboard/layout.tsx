@@ -5,7 +5,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, FolderOpen, FileSearch, Ticket, MessageSquare, FolderArchive, Shield, Settings, LogOut, Menu, X, Bell, MapPin, Activity } from 'lucide-react'
 import { useTheme } from '@/lib/theme-context'
-import { readJsonSafely } from '@/lib/client'
+import { clearStoredSession, getSessionLastActivityAt, getStoredUser, isSessionIdleExpired, markSessionActivity, readJsonSafely, setStoredUser, subscribeSessionCleared, subscribeStoredUser } from '@/lib/client'
 import { uiDialogEvents, type UiConfirmOptions } from '@/lib/ui-dialog'
 
 function isTokenExpired(token: string): boolean {
@@ -113,8 +113,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let alive = true
 
     const clearAndRedirect = () => {
-      localStorage.removeItem('fib_token')
-      localStorage.removeItem('fib_user')
+      clearStoredSession()
       window.location.href = '/login'
     }
 
@@ -124,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!alive) return
 
       const token = localStorage.getItem('fib_token')
-      if (!token || isTokenExpired(token)) { clearAndRedirect(); return }
+  if (!token || isTokenExpired(token) || isSessionIdleExpired()) { clearAndRedirect(); return }
 
       let res: Response | null = null
       try {
@@ -149,7 +148,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       if (!alive) return
-      localStorage.setItem('fib_user', JSON.stringify(me))
+      markSessionActivity()
+      setStoredUser(me)
       setUser(me)
       setChecking(false)
     }
@@ -158,13 +158,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { alive = false }
   }, [])
 
+  useEffect(() => {
+    setUser(getStoredUser())
+    const unsubUser = subscribeStoredUser(setUser)
+    const unsubSession = subscribeSessionCleared(() => setUser(null))
+    return () => {
+      unsubUser()
+      unsubSession()
+    }
+  }, [])
+
+  useEffect(() => {
+    const activityEvents: Array<keyof WindowEventMap> = ['pointerdown', 'keydown', 'mousemove', 'scroll', 'touchstart']
+    let lastMarkedAt = getSessionLastActivityAt()
+
+    const trackActivity = () => {
+      const now = Date.now()
+      if (now - lastMarkedAt < 60_000) return
+      lastMarkedAt = now
+      markSessionActivity(now)
+    }
+
+    if (!lastMarkedAt) {
+      lastMarkedAt = Date.now()
+      markSessionActivity(lastMarkedAt)
+    }
+
+    const checkIdle = () => {
+      if (isSessionIdleExpired()) {
+        clearStoredSession()
+        window.location.href = '/login?reason=expired'
+      }
+    }
+
+    for (const eventName of activityEvents) window.addEventListener(eventName, trackActivity, { passive: true })
+    const idleInterval = window.setInterval(checkIdle, 60_000)
+
+    return () => {
+      for (const eventName of activityEvents) window.removeEventListener(eventName, trackActivity)
+      window.clearInterval(idleInterval)
+    }
+  }, [])
+
   // Periodic token validity check (every 60s)
   useEffect(() => {
     const interval = setInterval(() => {
       const token = localStorage.getItem('fib_token')
-      if (!token || isTokenExpired(token)) {
-        localStorage.removeItem('fib_token')
-        localStorage.removeItem('fib_user')
+      if (!token || isTokenExpired(token) || isSessionIdleExpired()) {
+        clearStoredSession()
         window.location.href = '/login'
       }
     }, 60_000)
@@ -285,8 +326,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const logout = async () => {
-    localStorage.removeItem('fib_token')
-    localStorage.removeItem('fib_user')
+    clearStoredSession()
     // Clear the httpOnly session cookie server-side so middleware blocks immediately
     try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* ignore */ }
     window.location.href = '/login'

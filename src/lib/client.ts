@@ -1,6 +1,91 @@
 'use client'
 
+export const SESSION_MAX_IDLE_MS = 3 * 60 * 60 * 1000
+
+const USER_STORAGE_EVENT = 'fib-user-updated'
+const SESSION_STORAGE_EVENT = 'fib-session-cleared'
+const SESSION_ACTIVITY_KEY = 'fib_last_activity_at'
+
 function tok() { return typeof window !== 'undefined' ? localStorage.getItem('fib_token')||'' : '' }
+
+export function getStoredUser() {
+  if (typeof window === 'undefined') return null
+  const raw = localStorage.getItem('fib_user')
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+export function setStoredUser(user: any) {
+  if (typeof window === 'undefined') return
+  if (user == null) localStorage.removeItem('fib_user')
+  else localStorage.setItem('fib_user', JSON.stringify(user))
+  window.dispatchEvent(new CustomEvent(USER_STORAGE_EVENT, { detail: user ?? null }))
+}
+
+export function markSessionActivity(timestamp = Date.now()) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(SESSION_ACTIVITY_KEY, String(timestamp))
+}
+
+export function getSessionLastActivityAt() {
+  if (typeof window === 'undefined') return 0
+  const raw = Number(localStorage.getItem(SESSION_ACTIVITY_KEY) || '0')
+  return Number.isFinite(raw) ? raw : 0
+}
+
+export function isSessionIdleExpired(now = Date.now()) {
+  const lastActivity = getSessionLastActivityAt()
+  if (!lastActivity) return false
+  return now - lastActivity > SESSION_MAX_IDLE_MS
+}
+
+export function clearStoredSession() {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem('fib_token')
+  localStorage.removeItem('fib_user')
+  localStorage.removeItem(SESSION_ACTIVITY_KEY)
+  window.dispatchEvent(new CustomEvent(USER_STORAGE_EVENT, { detail: null }))
+  window.dispatchEvent(new Event(SESSION_STORAGE_EVENT))
+}
+
+export function subscribeStoredUser(callback: (user: any) => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  const onUserUpdated = (event: Event) => {
+    callback((event as CustomEvent<any>).detail ?? getStoredUser())
+  }
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === 'fib_user') callback(getStoredUser())
+    if (event.key === SESSION_ACTIVITY_KEY && event.newValue == null) callback(null)
+  }
+
+  window.addEventListener(USER_STORAGE_EVENT, onUserUpdated)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(USER_STORAGE_EVENT, onUserUpdated)
+    window.removeEventListener('storage', onStorage)
+  }
+}
+
+export function subscribeSessionCleared(callback: () => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  const onCleared = () => callback()
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === 'fib_token' && event.newValue == null) callback()
+  }
+
+  window.addEventListener(SESSION_STORAGE_EVENT, onCleared)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(SESSION_STORAGE_EVENT, onCleared)
+    window.removeEventListener('storage', onStorage)
+  }
+}
 
 export async function readJsonSafely<T>(res: Response, fallback: T): Promise<T> {
   const text = await res.text().catch(() => '')

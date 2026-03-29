@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, Trash2, FileText, StickyNote, Lock, X, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Search, User, MessageSquare } from 'lucide-react'
-import { getCarpeta, crearAnotacion, borrarCarpetaItem, getAgente, crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta } from '@/lib/client'
+import { getCarpeta, getStoredUser, crearAnotacion, borrarCarpetaItem, getAgente, crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta, subscribeStoredUser } from '@/lib/client'
 import { uiConfirm } from '@/lib/ui-dialog'
 
 function formatThreadParticipants(participantes: string[] = []) {
@@ -373,9 +373,9 @@ export default function CarpetaPage() {
   const activeThread = carpeta?.hilos?.find((hilo: any) => hilo.id === activeThreadId) || carpeta?.hilos?.[0]
 
   useEffect(() => {
-    const u = localStorage.getItem('fib_user')
-    if (u) {
-      const parsed = JSON.parse(u)
+    const parsed = getStoredUser()
+    const unsubscribe = subscribeStoredUser(setUser)
+    if (parsed) {
       setUser(parsed)
       Promise.all([
         getCarpeta(),
@@ -387,6 +387,7 @@ export default function CarpetaPage() {
     } else {
       setLoading(false)
     }
+    return () => unsubscribe()
   }, [])
 
   async function guardarAnotacion(e: React.FormEvent) {

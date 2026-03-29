@@ -4,6 +4,7 @@ import type { Rol } from './db'
 import { getSecret } from './secrets'
 
 const SECRET = getSecret('JWT_SECRET') || (process.env.NODE_ENV === 'production' ? '' : 'fib-dev-local-only')
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 3
 
 declare global {
   // eslint-disable-next-line no-var
@@ -25,7 +26,7 @@ export const signToken = (p: JWTPayload) => {
   if (!SECRET) {
     throw new Error('JWT secret is not configured')
   }
-  return jwt.sign(p, SECRET, { expiresIn: '7d' })
+  return jwt.sign(p, SECRET, { expiresIn: SESSION_MAX_AGE_SECONDS })
 }
 
 export const verifyToken = (t: string): JWTPayload | null => {
@@ -39,7 +40,25 @@ export const verifyToken = (t: string): JWTPayload | null => {
 
 export function getUser(req: NextRequest): JWTPayload | null {
   const h = req.headers.get('authorization') || ''
-  return h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null
+  if (!h.startsWith('Bearer ')) return null
+  const tokenUser = verifyToken(h.slice(7))
+  if (!tokenUser) return null
+
+  const liveUsers = (globalThis as any).__fibDB?.users
+  if (!liveUsers) return tokenUser
+
+  const liveUser = liveUsers.get(tokenUser.id)
+  if (!liveUser) return null
+
+  return {
+    id: liveUser.id,
+    username: liveUser.username,
+    rol: liveUser.rol,
+    nombre: liveUser.nombre ?? null,
+    agentNumber: liveUser.agentNumber ?? null,
+    callsign: liveUser.callsign ?? null,
+    clases: Array.isArray(liveUser.clases) ? liveUser.clases : [],
+  }
 }
 
 export const err          = (msg: string, status=400) => NextResponse.json({ error:msg }, { status })

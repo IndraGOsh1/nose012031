@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
 import { findInviteByCode, getDB, listUsersFresh, persistUserAndInvite } from '@/lib/db'
-import { signToken, err } from '@/lib/auth'
+import { SESSION_MAX_AGE_SECONDS, signToken, err } from '@/lib/auth'
 import { logRegister } from '@/lib/webhook'
 import { getRequestIp, isStrongEnoughPassword, rateLimit } from '@/lib/security'
 import { getCarpeta } from '@/lib/carpeta-db'
@@ -61,5 +61,13 @@ export async function POST(req: NextRequest) {
   }
   logRegister(user.username, user.rol, nextInvite.codigo)
   const token = signToken({ id, username:user.username, rol:user.rol, nombre:user.nombre, agentNumber:user.agentNumber, callsign:null, clases: [] })
-  return NextResponse.json({ token, usuario:{ id, username:user.username, rol:user.rol, nombre:user.nombre, agentNumber:user.agentNumber, callsign:null, clases: [] } }, { status:201 })
+  const res = NextResponse.json({ token, usuario:{ id, username:user.username, rol:user.rol, nombre:user.nombre, agentNumber:user.agentNumber, callsign:null, clases: [] } }, { status:201 })
+  res.cookies.set('fib_session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    path: '/',
+  })
+  return res
 }

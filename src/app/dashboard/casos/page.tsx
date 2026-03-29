@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Plus, RefreshCw, X, ChevronRight, AlertCircle, CheckCircle, FileText, Clock, Shield, Send, MessageCircle } from 'lucide-react'
-import { getCasos, getCaso, crearCaso, editarCaso, borrarCaso } from '@/lib/client'
+import { getCasos, getCaso, getStoredUser, crearCaso, editarCaso, borrarCaso, subscribeStoredUser } from '@/lib/client'
 import { Toast, ToastType } from '@/components/Toast'
 import { TableSkeleton } from '@/components/Skeleton'
 
@@ -470,7 +470,10 @@ export default function CasosPage() {
   const [toast,   setToast]   = useState<{msg:string;type:ToastType}|null>(null)
   const [filtroEstado, setFiltroEstado] = useState('')
 
-  useEffect(() => { const u = localStorage.getItem('fib_user'); if (u) setUser(JSON.parse(u)) }, [])
+  useEffect(() => {
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)

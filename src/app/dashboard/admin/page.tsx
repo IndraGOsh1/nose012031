@@ -17,6 +17,7 @@ import {
   Globe,
 } from 'lucide-react'
 import {
+  getStoredUser,
   getInvites,
   crearInvite,
   borrarInvite,
@@ -33,6 +34,8 @@ import {
   deleteFormResponse,
   getConfigVisual,
   setConfigVisual,
+  setStoredUser,
+  subscribeStoredUser,
 } from '@/lib/client'
 import { uiConfirm } from '@/lib/ui-dialog'
 import { FORM_BRANCHES, FORM_CLASSES } from '@/lib/forms-db'
@@ -145,8 +148,8 @@ export default function AdminPage() {
   const canManageForms = ['command_staff', 'supervisory'].includes(user?.rol)
 
   useEffect(() => {
-    const u = localStorage.getItem('fib_user')
-    if (u) setUser(JSON.parse(u))
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
   }, [])
 
   useEffect(() => {
@@ -289,9 +292,13 @@ export default function AdminPage() {
 
   async function toggleUser(id: string, activo: boolean) {
     try {
-      await editarUser(id, { activo })
+      const res = await editarUser(id, { activo })
+      const nextUser = res?.usuario
+      if (nextUser) {
+        setUsers((prev) => prev.map((entry) => entry.id === id ? nextUser : entry))
+        if (user?.id === id) setStoredUser(nextUser)
+      }
       setToast({ msg: `Usuario ${activo ? 'activado' : 'desactivado'}`, ok: true })
-      await loadUsers()
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
     }
@@ -304,9 +311,13 @@ export default function AdminPage() {
       return
     }
     try {
-      await editarUser(id, { vetado: !vetado, vetoReason: reason.trim() || undefined })
+      const res = await editarUser(id, { vetado: !vetado, vetoReason: reason.trim() || undefined })
+      const nextUser = res?.usuario
+      if (nextUser) {
+        setUsers((prev) => prev.map((entry) => entry.id === id ? nextUser : entry))
+        if (user?.id === id) setStoredUser(nextUser)
+      }
       setToast({ msg: !vetado ? `Usuario vetado: ${username}` : `Veto retirado: ${username}`, ok: true })
-      await loadUsers()
       setVetoReason((p) => ({ ...p, [id]: '' }))
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
@@ -320,9 +331,13 @@ export default function AdminPage() {
       return
     }
     try {
-      await editarUser(id, { congelado: !congelado, congeladoReason: reason.trim() || undefined })
+      const res = await editarUser(id, { congelado: !congelado, congeladoReason: reason.trim() || undefined })
+      const nextUser = res?.usuario
+      if (nextUser) {
+        setUsers((prev) => prev.map((entry) => entry.id === id ? nextUser : entry))
+        if (user?.id === id) setStoredUser(nextUser)
+      }
       setToast({ msg: !congelado ? `Usuario congelado: ${username}` : `Congelación retirada: ${username}`, ok: true })
-      await loadUsers()
       setFreezeReason((p) => ({ ...p, [id]: '' }))
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
@@ -347,9 +362,13 @@ export default function AdminPage() {
     try {
       const patch = userEdit[id]
       if (!patch) return
-      await editarUser(id, patch)
+      const res = await editarUser(id, patch)
+      const nextUser = res?.usuario
+      if (nextUser) {
+        setUsers((prev) => prev.map((entry) => entry.id === id ? nextUser : entry))
+        if (user?.id === id) setStoredUser(nextUser)
+      }
       setToast({ msg: 'Usuario actualizado', ok: true })
-      await loadUsers()
       setUserEdit((p) => ({ ...p, [id]: undefined }))
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
@@ -360,8 +379,11 @@ export default function AdminPage() {
     if (!await uiConfirm(`¿Eliminar usuario ${username}? Esta acción no se puede deshacer.`, { tone: 'danger', title: 'Eliminar usuario' })) return
     try {
       await borrarUser(id)
+      setUsers((prev) => prev.filter((entry) => entry.id !== id))
+      setUserEdit((prev) => ({ ...prev, [id]: undefined }))
+      setVetoReason((prev) => ({ ...prev, [id]: '' }))
+      setFreezeReason((prev) => ({ ...prev, [id]: '' }))
       setToast({ msg: 'Usuario eliminado', ok: true })
-      await loadUsers()
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
     }
@@ -371,9 +393,13 @@ export default function AdminPage() {
     const cs = callsignEdit[id]
     if (!cs?.trim()) return
     try {
-      await editarUser(id, { callsign: cs.trim() })
+      const res = await editarUser(id, { callsign: cs.trim() })
+      const nextUser = res?.usuario
+      if (nextUser) {
+        setUsers((prev) => prev.map((entry) => entry.id === id ? nextUser : entry))
+        if (user?.id === id) setStoredUser(nextUser)
+      }
       setToast({ msg: `Callsign asignado a ${username}`, ok: true })
-      await loadUsers()
       setCallsignEdit((p) => ({ ...p, [id]: '' }))
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })

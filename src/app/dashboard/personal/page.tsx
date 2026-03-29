@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { Search, Plus, RefreshCw, ChevronRight, X, AlertCircle, CheckCircle } from 'lucide-react'
-import { getPersonal, crearAgente, editarAgente, sancionar, getConfig } from '@/lib/client'
+import { getPersonal, getStoredUser, crearAgente, editarAgente, sancionar, getConfig, subscribeStoredUser } from '@/lib/client'
 import { CONFIG, todosLosRangos } from '@/lib/config'
 
 const ESTADO_TAG: Record<string,string> = {
@@ -317,8 +317,8 @@ export default function PersonalPage() {
   const [filtroSeccion, setFiltroSeccion] = useState('')
 
   useEffect(() => {
-    const u = localStorage.getItem('fib_user')
-    if (u) setUser(JSON.parse(u))
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
   }, [])
 
   const load = useCallback(async () => {

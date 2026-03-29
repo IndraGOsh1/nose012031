@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getDB } from '@/lib/db'
-import { signToken, err, unauthorized } from '@/lib/auth'
+import { SESSION_MAX_AGE_SECONDS, signToken, err, unauthorized } from '@/lib/auth'
 import { logLogin } from '@/lib/webhook'
 import { getRequestIp, rateLimit } from '@/lib/security'
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 60 * 60 * 24 * 7, // 7 days — mirrors JWT expiry
+    maxAge: SESSION_MAX_AGE_SECONDS,
     path: '/',
   })
   return res

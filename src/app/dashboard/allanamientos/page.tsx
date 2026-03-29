@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Send, FileText, Check, XCircle, PenTool, Trash2, Pencil } from 'lucide-react'
-import { getAllanamientos, crearAllanamiento, editarAllanamiento, getAllanamiento, borrarAllanamiento } from '@/lib/client'
+import { getAllanamientos, crearAllanamiento, editarAllanamiento, getAllanamiento, getStoredUser, borrarAllanamiento, subscribeStoredUser } from '@/lib/client'
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog'
 
 const ESTADO_TAG: Record<string,string> = {
@@ -470,7 +470,10 @@ export default function AllanamientosPage() {
   const [toast,   setToast]   = useState<{msg:string;ok:boolean}|null>(null)
   const [filtro,  setFiltro]  = useState('activos')
 
-  useEffect(()=>{ const u=localStorage.getItem('fib_user'); if(u) setUser(JSON.parse(u)) },[])
+  useEffect(() => {
+    setUser(getStoredUser())
+    return subscribeStoredUser(setUser)
+  }, [])
   const load = useCallback(async()=>{
     setLoading(true)
     try {

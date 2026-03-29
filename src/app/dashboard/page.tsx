@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Users, FolderOpen, FileSearch, Ticket, TrendingUp, Shield, ChevronRight, ClipboardList, Plus, Trash2 } from 'lucide-react'
-import { getStats, getForms, saveForm, submitForm, getFormResponses } from '@/lib/client'
+import { getStats, getForms, getStoredUser, saveForm, submitForm, getFormResponses, subscribeStoredUser } from '@/lib/client'
 import { uiConfirm } from '@/lib/ui-dialog'
 
 type FieldType = 'text' | 'textarea' | 'number' | 'date'
@@ -38,8 +38,8 @@ export default function DashboardHome() {
   const [formsMsg, setFormsMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
-    const u = localStorage.getItem('fib_user')
-    if (u) setUser(JSON.parse(u))
+    setUser(getStoredUser())
+    const unsubscribe = subscribeStoredUser(setUser)
     getStats().then(setStats).catch(() => {}).finally(() => setLoading(false))
     loadForms()
 
@@ -48,7 +48,10 @@ export default function DashboardHome() {
       loadForms()
     }, 45_000)
 
-    return () => clearInterval(refresh)
+    return () => {
+      clearInterval(refresh)
+      unsubscribe()
+    }
   }, [])
 
   async function loadForms() {
