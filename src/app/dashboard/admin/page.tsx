@@ -153,8 +153,21 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
+    const savedTab = localStorage.getItem('fib_admin_tab')
+    if (!savedTab) return
+    const allowed: Tab[] = ['invites', 'users', 'callsigns', 'carpetas', 'forms', 'website']
+    if (allowed.includes(savedTab as Tab)) {
+      setTab(savedTab as Tab)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isCS && (tab === 'invites' || tab === 'website')) setTab('users')
   }, [isCS, tab])
+
+  useEffect(() => {
+    localStorage.setItem('fib_admin_tab', tab)
+  }, [tab])
 
   useEffect(() => {
     if (tab === 'invites') loadInvites()
@@ -578,6 +591,7 @@ export default function AdminPage() {
       }
       await setConfigVisual({ oposicionesInfo: opos })
       setWebsiteConfig((prev: any) => ({ ...prev, oposicionesInfo: opos }))
+      await loadWebsiteConfig()
       setToast({ msg: 'Configuración Google Forms guardada', ok: true })
     } catch (e: any) {
       setToast({ msg: e.message || 'No se pudo guardar configuración Google Forms', ok: false })
@@ -870,6 +884,43 @@ export default function AdminPage() {
                   {googleBusy ? 'Cargando...' : 'Ver respuestas Google'}
                 </button>
               </div>
+            </div>
+
+            <div className="border border-bg-border bg-bg-surface p-3 mb-3">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-300 mb-2">Referencia del formulario (persistente)</p>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                <input
+                  className="input text-xs py-2"
+                  value={websiteConfig?.oposicionesInfo?.googleFormId || ''}
+                  onChange={(e) => setWebsiteConfig((p: any) => ({
+                    ...p,
+                    oposicionesInfo: {
+                      ...(p?.oposicionesInfo || {}),
+                      googleFormId: e.target.value,
+                    },
+                  }))}
+                  placeholder="Pega URL completa o ID del Google Form"
+                />
+                <button
+                  onClick={() => saveGoogleFormSettings({ googleFormId: websiteConfig?.oposicionesInfo?.googleFormId || '' })}
+                  disabled={!isCS || googleBusy}
+                  className="btn-primary py-2 disabled:opacity-50"
+                >
+                  Guardar link/ID
+                </button>
+              </div>
+              {(() => {
+                const google = buildGoogleFormUrls(websiteConfig?.oposicionesInfo?.googleFormId || '')
+                if (!google.openUrl) {
+                  return <p className="text-[11px] text-tx-muted mt-2">Sin referencia válida todavía.</p>
+                }
+                return (
+                  <div className="mt-2">
+                    <a href={google.openUrl} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-blue hover:underline">Abrir formulario actual en nueva pestaña</a>
+                    <iframe title="Google Form Preview (admin)" src={google.embedUrl} className="w-full h-[260px] border border-bg-border bg-black mt-2" loading="lazy" />
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
