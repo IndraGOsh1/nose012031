@@ -1131,6 +1131,30 @@ export default function AdminPage() {
                   <button onClick={saveWebsiteConfig} disabled={websiteSaving} className="btn-primary py-2">{websiteSaving ? 'Guardando...' : 'Guardar website'}</button>
                 </div>
 
+                <div className="border border-bg-border bg-bg-surface p-4">
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-300 mb-3">Preview rápida</p>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div className="border border-bg-border bg-bg-card p-3">
+                      <p className="font-display text-xs tracking-wider uppercase text-tx-primary">Misión</p>
+                      <p className="text-xs text-tx-secondary mt-1 line-clamp-3">{websiteConfig.textoMision || 'Sin texto de misión'}</p>
+                    </div>
+                    <div className="border border-bg-border bg-bg-card p-3">
+                      <p className="font-display text-xs tracking-wider uppercase text-tx-primary">Oposiciones</p>
+                      <p className="text-xs text-tx-secondary mt-1">{websiteConfig.oposicionesInfo?.titulo || 'Sin título'}</p>
+                      <p className="font-mono text-[10px] text-tx-muted mt-2">Pasos: {Array.isArray(websiteConfig.oposicionesInfo?.formularioPasos) ? websiteConfig.oposicionesInfo.formularioPasos.filter(Boolean).length : 0}</p>
+                      <p className="font-mono text-[10px] text-tx-muted">Datos: {Array.isArray(websiteConfig.oposicionesInfo?.datos) ? websiteConfig.oposicionesInfo.datos.filter(Boolean).length : 0}</p>
+                    </div>
+                    <div className="border border-bg-border bg-bg-card p-3">
+                      <p className="font-display text-xs tracking-wider uppercase text-tx-primary">FAQ</p>
+                      <p className="font-mono text-[10px] text-tx-muted mt-1">Preguntas: {Array.isArray(websiteConfig.faqInfo?.items) ? websiteConfig.faqInfo.items.filter((x: any) => x?.pregunta).length : 0}</p>
+                    </div>
+                    <div className="border border-bg-border bg-bg-card p-3">
+                      <p className="font-display text-xs tracking-wider uppercase text-tx-primary">Organigrama</p>
+                      <p className="font-mono text-[10px] text-tx-muted mt-1">{websiteConfig.organigramaInfo?.imageUrl ? 'Imagen cargada' : 'Sin imagen'}</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="label">Texto de Misión</label>
                   <textarea className="input min-h-24" value={websiteConfig.textoMision || ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, textoMision: e.target.value }))} />
@@ -1171,17 +1195,136 @@ export default function AdminPage() {
 
                 <div>
                   <label className="label">Pasos (uno por línea)</label>
-                  <textarea className="input min-h-20" value={Array.isArray(websiteConfig.oposicionesInfo?.formularioPasos) ? websiteConfig.oposicionesInfo.formularioPasos.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), formularioPasos: e.target.value.split('\n') } }))} />
+                  <div className="space-y-2">
+                    {(Array.isArray(websiteConfig.oposicionesInfo?.formularioPasos) ? websiteConfig.oposicionesInfo.formularioPasos : []).map((step: string, idx: number) => (
+                      <div key={`step-${idx}`} className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-tx-muted w-5">{idx + 1}.</span>
+                        <input
+                          className="input text-xs py-2 flex-1"
+                          value={step || ''}
+                          placeholder="Paso del formulario"
+                          onChange={(e) => setWebsiteConfig((p: any) => {
+                            const steps = Array.isArray(p.oposicionesInfo?.formularioPasos) ? [...p.oposicionesInfo.formularioPasos] : []
+                            steps[idx] = e.target.value
+                            return { ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), formularioPasos: steps } }
+                          })}
+                        />
+                        <button
+                          className="font-mono text-[9px] text-red-400 hover:text-red-300"
+                          onClick={() => setWebsiteConfig((p: any) => {
+                            const steps = Array.isArray(p.oposicionesInfo?.formularioPasos) ? [...p.oposicionesInfo.formularioPasos] : []
+                            steps.splice(idx, 1)
+                            return { ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), formularioPasos: steps } }
+                          })}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      className="btn-ghost py-1.5 text-[9px]"
+                      onClick={() => setWebsiteConfig((p: any) => ({
+                        ...p,
+                        oposicionesInfo: {
+                          ...(p.oposicionesInfo || {}),
+                          formularioPasos: [...(Array.isArray(p.oposicionesInfo?.formularioPasos) ? p.oposicionesInfo.formularioPasos : []), ''],
+                        },
+                      }))}
+                    >
+                      + Agregar paso
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="label">Datos clave (uno por línea)</label>
-                  <textarea className="input min-h-24" value={Array.isArray(websiteConfig.oposicionesInfo?.datos) ? websiteConfig.oposicionesInfo.datos.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), datos: e.target.value.split('\n') } }))} />
+                  <div className="space-y-2">
+                    {(Array.isArray(websiteConfig.oposicionesInfo?.datos) ? websiteConfig.oposicionesInfo.datos : []).map((dato: string, idx: number) => (
+                      <div key={`dato-${idx}`} className="flex items-center gap-2">
+                        <input
+                          className="input text-xs py-2 flex-1"
+                          value={dato || ''}
+                          placeholder="Dato clave"
+                          onChange={(e) => setWebsiteConfig((p: any) => {
+                            const datos = Array.isArray(p.oposicionesInfo?.datos) ? [...p.oposicionesInfo.datos] : []
+                            datos[idx] = e.target.value
+                            return { ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), datos } }
+                          })}
+                        />
+                        <button
+                          className="font-mono text-[9px] text-red-400 hover:text-red-300"
+                          onClick={() => setWebsiteConfig((p: any) => {
+                            const datos = Array.isArray(p.oposicionesInfo?.datos) ? [...p.oposicionesInfo.datos] : []
+                            datos.splice(idx, 1)
+                            return { ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), datos } }
+                          })}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      className="btn-ghost py-1.5 text-[9px]"
+                      onClick={() => setWebsiteConfig((p: any) => ({
+                        ...p,
+                        oposicionesInfo: {
+                          ...(p.oposicionesInfo || {}),
+                          datos: [...(Array.isArray(p.oposicionesInfo?.datos) ? p.oposicionesInfo.datos : []), ''],
+                        },
+                      }))}
+                    >
+                      + Agregar dato
+                    </button>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="label">Imágenes de oposiciones (una por línea)</label>
-                  <textarea className="input min-h-24" value={Array.isArray(websiteConfig.oposicionesInfo?.imagenes) ? websiteConfig.oposicionesInfo.imagenes.join('\n') : ''} onChange={(e) => setWebsiteConfig((p: any) => ({ ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), imagenes: e.target.value.split('\n') } }))} />
+                  <label className="label">Imágenes de oposiciones</label>
+                  <div className="space-y-2">
+                    {(Array.isArray(websiteConfig.oposicionesInfo?.imagenes) ? websiteConfig.oposicionesInfo.imagenes : []).map((img: string, idx: number) => (
+                      <div key={`img-${idx}`} className="border border-bg-border bg-bg-surface p-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="input text-xs py-2 flex-1"
+                            value={img || ''}
+                            placeholder="https://..."
+                            onChange={(e) => setWebsiteConfig((p: any) => {
+                              const imagenes = Array.isArray(p.oposicionesInfo?.imagenes) ? [...p.oposicionesInfo.imagenes] : []
+                              imagenes[idx] = e.target.value
+                              return { ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), imagenes } }
+                            })}
+                          />
+                          <button
+                            className="font-mono text-[9px] text-red-400 hover:text-red-300"
+                            onClick={() => setWebsiteConfig((p: any) => {
+                              const imagenes = Array.isArray(p.oposicionesInfo?.imagenes) ? [...p.oposicionesInfo.imagenes] : []
+                              imagenes.splice(idx, 1)
+                              return { ...p, oposicionesInfo: { ...(p.oposicionesInfo || {}), imagenes } }
+                            })}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {img && (
+                          <div className="mt-2 border border-bg-border overflow-hidden">
+                            <img src={img} alt={`Oposicion ${idx + 1}`} className="w-full object-cover" style={{ maxHeight: '140px' }} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      className="btn-ghost py-1.5 text-[9px]"
+                      onClick={() => setWebsiteConfig((p: any) => ({
+                        ...p,
+                        oposicionesInfo: {
+                          ...(p.oposicionesInfo || {}),
+                          imagenes: [...(Array.isArray(p.oposicionesInfo?.imagenes) ? p.oposicionesInfo.imagenes : []), ''],
+                        },
+                      }))}
+                    >
+                      + Agregar imagen
+                    </button>
+                  </div>
                 </div>
               </div>
 

@@ -165,6 +165,66 @@ function getSupabase() {
 declare global { var __fibConfigVisual2: ConfigVisual | undefined }
 if (!global.__fibConfigVisual2) global.__fibConfigVisual2 = { ...DEFAULT }
 
+const CONFIG_VISUAL_DB_COLUMNS = [
+  'id',
+  'nombreDivision',
+  'descripcionDivision',
+  'logoUrl',
+  'colorPrimario',
+  'colorSidebar',
+  'colorAcento',
+  'fondoDashboardUrl',
+  'fondoHeroUrl',
+  'fondoOpacidad',
+  'bannerActivo',
+  'bannerTexto',
+  'bannerColor',
+  'modoOscuroDefault',
+  'textoHero',
+  'textoSubhero',
+  'textoMision',
+  'oposicionesInfo',
+  'comunicadosInfo',
+  'websiteSettings',
+  'divisionesInfo',
+  'faqInfo',
+  'organigramaInfo',
+  'indraRecoveryUsedAt',
+  'actualizadoPor',
+  'actualizadoEn',
+] as const
+
+function parseMissingColumn(message: string): string | null {
+  const m = String(message || '').match(/Could not find the '([^']+)' column/i)
+  return m?.[1] ? String(m[1]) : null
+}
+
+function buildConfigVisualPayload(cfg: ConfigVisual, omittedColumns: Set<string>) {
+  const source = { id: ROW_KEY, ...cfg } as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const key of CONFIG_VISUAL_DB_COLUMNS) {
+    if (omittedColumns.has(key)) continue
+    if (source[key] !== undefined) out[key] = source[key]
+  }
+  return out
+}
+
+async function upsertConfigVisualResilient(cfg: ConfigVisual) {
+  const omittedColumns = new Set<string>()
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const payload = buildConfigVisualPayload(cfg, omittedColumns)
+    const { error } = await getSupabase().from('config_visual').upsert(payload)
+    if (!error) return
+    const missing = parseMissingColumn(error.message || '')
+    if (!missing || omittedColumns.has(missing)) {
+      throw new Error(error.message)
+    }
+    omittedColumns.add(missing)
+    console.warn(`[ConfigVisualDB] Missing column '${missing}' on config_visual. Saving without it until migration is applied.`)
+  }
+  throw new Error('No se pudo guardar config_visual: demasiados reintentos por columnas faltantes.')
+}
+
 async function loadFromSupabase(): Promise<ConfigVisual> {
   try {
     const { data, error } = await getSupabase()
@@ -173,8 +233,8 @@ async function loadFromSupabase(): Promise<ConfigVisual> {
       .eq('id', ROW_KEY)
       .single()
     if (error || !data) {
-      // Insert default row
-      await getSupabase().from('config_visual').upsert({ id: ROW_KEY, ...DEFAULT })
+      // Ensure row exists; retry with a resilient payload when schema lags behind code.
+      await upsertConfigVisualResilient(DEFAULT)
       return { ...DEFAULT }
     }
     const { id: _id, ...rest } = data
@@ -185,10 +245,7 @@ async function loadFromSupabase(): Promise<ConfigVisual> {
 }
 
 async function saveToSupabase(cfg: ConfigVisual) {
-  const { error } = await getSupabase().from('config_visual').upsert({ id: ROW_KEY, ...cfg })
-  if (error) {
-    throw new Error(error.message)
-  }
+  await upsertConfigVisualResilient(cfg)
 }
 
 // Init
