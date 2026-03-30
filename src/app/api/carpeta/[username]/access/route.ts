@@ -9,7 +9,8 @@ import { getCarpeta, addAgentAccessCarpeta, removeAgentAccessCarpeta } from '@/l
  * Solo admin/supervisory puede gestionar acceso
  */
 
-export async function POST(req: NextRequest, { params }: { params: { username: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params
   const user = getUser(req)
   if (!user) return unauthorized()
   if (!['command_staff', 'supervisory'].includes(user.rol)) return forbidden()
@@ -22,9 +23,9 @@ export async function POST(req: NextRequest, { params }: { params: { username: s
   }
 
   try {
-    const carpeta = await getCarpeta(params.username)
+    const carpeta = await getCarpeta(username)
     
-    await addAgentAccessCarpeta(params.username, agent)
+    await addAgentAccessCarpeta(username, agent)
 
     return NextResponse.json({ 
       success: true, 
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest, { params }: { params: { username: s
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { username: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params
   const user = getUser(req)
   if (!user) return unauthorized()
   if (!['command_staff', 'supervisory'].includes(user.rol)) return forbidden()
@@ -49,9 +51,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { username:
   }
 
   try {
-    const carpeta = await getCarpeta(params.username)
+    const carpeta = await getCarpeta(username)
     
-    await removeAgentAccessCarpeta(params.username, agent)
+    await removeAgentAccessCarpeta(username, agent)
 
     return NextResponse.json({ 
       success: true, 

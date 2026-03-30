@@ -9,7 +9,8 @@ import { getCasosDB, addAgentAccessCaso, removeAgentAccessCaso } from '@/lib/cas
  * Solo admin/supervisory puede gestionar acceso
  */
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = getUser(req)
   if (!user) return unauthorized()
   if (!['command_staff', 'supervisory'].includes(user.rol)) return forbidden()
@@ -23,13 +24,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   try {
     const db = await getCasosDB()
-    const caso = db.get(params.id)
+    const caso = db.get(id)
     
     if (!caso) {
       return notFound('Caso no encontrado')
     }
 
-    await addAgentAccessCaso(params.id, agent)
+    await addAgentAccessCaso(id, agent)
 
     return NextResponse.json({ 
       success: true, 
@@ -41,7 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = getUser(req)
   if (!user) return unauthorized()
   if (!['command_staff', 'supervisory'].includes(user.rol)) return forbidden()
@@ -55,13 +57,13 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   try {
     const db = await getCasosDB()
-    const caso = db.get(params.id)
+    const caso = db.get(id)
     
     if (!caso) {
       return notFound('Caso no encontrado')
     }
 
-    await removeAgentAccessCaso(params.id, agent)
+    await removeAgentAccessCaso(id, agent)
 
     return NextResponse.json({ 
       success: true, 
