@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Plus, Trash2, FileText, StickyNote, Lock, X, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Search, User, MessageSquare } from 'lucide-react'
-import { getCarpeta, getStoredUser, crearAnotacion, borrarCarpetaItem, getAgente, crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta, subscribeStoredUser } from '@/lib/client'
+import { Plus, Trash2, FileText, StickyNote, Lock, X, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Search, User, MessageSquare, Users } from 'lucide-react'
+import { getCarpeta, getStoredUser, crearAnotacion, borrarCarpetaItem, getAgente, crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta, subscribeStoredUser, addAgentToCarpeta, removeAgentFromCarpeta, getPersonal } from '@/lib/client'
 import { uiConfirm } from '@/lib/ui-dialog'
 
 function formatThreadParticipants(participantes: string[] = []) {
@@ -100,6 +100,75 @@ function PersonalSearchDropdown({ onSelect, placeholder = 'Buscar agente...' }: 
   )
 }
 
+// ── Manage carpeta access modal ────────────────────────────────────────────
+function ModalGestionarAccesoCarpeta({ ownerUsername, acceso, onClose, onUpdate, onError }: { ownerUsername:string; acceso:string[]; onClose:()=>void; onUpdate:(m:string)=>void; onError:(m:string)=>void }) {
+  const [loading, setLoading] = useState(false)
+
+  async function addAgent(agente: any) {
+    const username = agente.username || agente.nombre?.toLowerCase()
+    if (!username) return
+    setLoading(true)
+    try {
+      await addAgentToCarpeta(ownerUsername, username)
+      onUpdate(`Acceso otorgado a ${agente.nombre}`)
+    } catch(e:any) {
+      onError(e.message || 'Error al agregar agente')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function removeAgent(agentUsername: string) {
+    setLoading(true)
+    try {
+      await removeAgentFromCarpeta(ownerUsername, agentUsername)
+      onUpdate(`Acceso revocado a ${agentUsername}`)
+    } catch(e:any) {
+      onError(e.message || 'Error al remover agente')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="bg-bg-card border border-bg-border w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border">
+          <div><span className="section-tag">// Gestionar Acceso</span><p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Control de Acceso</p></div>
+          <button onClick={onClose} className="text-tx-muted hover:text-tx-primary"><X size={15}/></button>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <div>
+            <p className="text-xs text-tx-secondary mb-3">Agentes con acceso actual:</p>
+            {acceso.length === 0 ? (
+              <p className="font-mono text-[9px] text-tx-muted">Sin agentes</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {acceso.map(agent => (
+                  <div key={agent} className="flex items-center gap-2 px-2 py-1 bg-accent-blue/10 border border-accent-blue/30 rounded text-xs">
+                    <span>{agent}</span>
+                    <button 
+                      onClick={() => removeAgent(agent)}
+                      disabled={loading}
+                      className="hover:text-red-400 disabled:opacity-50"
+                    >
+                      <X size={12}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-tx-secondary mb-2">Agregar agente:</p>
+            <PersonalSearchDropdown onSelect={addAgent} placeholder="Buscar agente..." />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Carpeta de otro agente (para roles superiores) ─────────────────────
 function CarpetaExterna({ agente, onClose }: { agente: any; onClose: () => void }) {
   const [carpeta, setCarpeta] = useState<any>(null)
@@ -108,6 +177,8 @@ function CarpetaExterna({ agente, onClose }: { agente: any; onClose: () => void 
   const [threadText, setThreadText] = useState('')
   const [threadBusy, setThreadBusy] = useState(false)
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
+  const [showAccessModal, setShowAccessModal] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   const loadCarpeta = useCallback(() => {
     const token = localStorage.getItem('fib_token') || ''
@@ -125,6 +196,7 @@ function CarpetaExterna({ agente, onClose }: { agente: any; onClose: () => void 
 
   useEffect(() => {
     loadCarpeta()
+    setUser(getStoredUser() || {})
   }, [loadCarpeta])
 
   const activeThread = carpeta?.hilos?.find((hilo: any) => hilo.id === activeThreadId) || carpeta?.hilos?.[0]
@@ -197,7 +269,14 @@ function CarpetaExterna({ agente, onClose }: { agente: any; onClose: () => void 
             <p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">{agente.nombre}</p>
             <p className="font-mono text-[8px] text-tx-muted">{agente.rango} · #{agente.numero}</p>
           </div>
-          <button onClick={onClose} className="text-tx-muted hover:text-tx-primary"><X size={15}/></button>
+          <div className="flex items-center gap-2">
+            {['command_staff','supervisory'].includes(user?.rol) && (
+              <button onClick={() => setShowAccessModal(true)} title="Gestionar acceso" className="text-tx-muted hover:text-accent-blue transition-colors">
+                <Users size={15}/>
+              </button>
+            )}
+            <button onClick={onClose} className="text-tx-muted hover:text-tx-primary"><X size={15}/></button>
+          </div>
         </div>
 
         <div className="flex border-b border-bg-border shrink-0">
@@ -949,6 +1028,18 @@ export default function CarpetaPage() {
             </div>
           )}
         </div>
+      )}
+      {showAccessModal && carpeta && (
+        <ModalGestionarAccesoCarpeta 
+          ownerUsername={agente.username || agente.nombre}
+          acceso={carpeta.acceso || []}
+          onClose={() => setShowAccessModal(false)} 
+          onUpdate={m => { 
+            loadCarpeta(); 
+            setShowAccessModal(false) 
+          }} 
+          onError={console.error}
+        />
       )}
     </div>
   )

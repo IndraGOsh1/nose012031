@@ -46,6 +46,7 @@ export interface Caso {
   unidad:       string
   agenteLead:   string
   agentesAsignados: string[]
+  agentesAcceso: string[]
   sospechosos:  Sospechoso[]
   evidencias:   Evidencia[]
   notas:        Nota[]
@@ -72,7 +73,7 @@ const initialCasos: Caso[] = [
     id: 'caso-001', numeroCaso: 'FIB-2024-001',
     titulo: 'Caso Los Fantasmas', descripcion: 'Investigación sobre red de tráfico en zona portuaria.',
     tipo: 'Crimen Organizado', estado: 'en_progreso', prioridad: 'alta',
-    unidad: 'CIRG', agenteLead: 'Director', agentesAsignados: ['Director','Supervisor'],
+    unidad: 'CIRG', agenteLead: 'Director', agentesAsignados: ['Director','Supervisor'], agentesAcceso: ['Director','Supervisor'],
     sospechosos: [{ id:'s1', nombre:'John Doe', alias:'El Fantasma', descripcion:'Líder presunto de la organización', estado:'prófugo' }],
     evidencias: [{ id:'e1', titulo:'Fotografías del puerto', tipo:'imagen', descripcion:'Capturas de vigilancia nocturna', subidoPor:'Director', fecha:new Date().toISOString() }],
     notas: [{ id:'n1', contenido:'Fuente confidencial confirmó reunión el martes.', autor:'Director', fecha:new Date().toISOString(), privada:true }],
@@ -124,4 +125,38 @@ let casoCounter = 2
 export function nextCaseNumber() {
   const n = String(casoCounter++).padStart(3,'0')
   return `FIB-${new Date().getFullYear()}-${n}`
+}
+
+/**
+ * Verifica si un usuario puede acceder a un caso.
+ * Admin/Supervisor: acceso total
+ * Otros: solo si están en agentesAcceso o son agenteLead
+ */
+export function canAccessCaso(caso: Caso, username: string, userRole: string): boolean {
+  if (['command_staff', 'supervisory'].includes(userRole)) return true
+  return caso.agentesAcceso.includes(username) || caso.agenteLead === username
+}
+
+/**
+ * Agrega un agente al acceso del caso
+ */
+export async function addAgentAccessCaso(casoId: string, agentUsername: string) {
+  const db = await getCasosDB()
+  const caso = db.get(casoId)
+  if (!caso) throw new Error('Caso no encontrado')
+  if (!caso.agentesAcceso.includes(agentUsername)) {
+    caso.agentesAcceso.push(agentUsername)
+    await persistentMapSet(db, casoId, caso)
+  }
+}
+
+/**
+ * Revoca acceso de un agente al caso
+ */
+export async function removeAgentAccessCaso(casoId: string, agentUsername: string) {
+  const db = await getCasosDB()
+  const caso = db.get(casoId)
+  if (!caso) throw new Error('Caso no encontrado')
+  caso.agentesAcceso = caso.agentesAcceso.filter(u => u !== agentUsername)
+  await persistentMapSet(db, casoId, caso)
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, err, isUserFrozen, frozen } from '@/lib/auth'
-import { getCasosDB, nextCaseNumber, persistCaso, type Caso } from '@/lib/casos-db'
+import { getCasosDB, nextCaseNumber, persistCaso, type Caso, canAccessCaso } from '@/lib/casos-db'
 
 export async function GET(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
@@ -11,7 +11,12 @@ export async function GET(req: NextRequest) {
 
   const CasosDB = await getCasosDB()
   let lista = Array.from(CasosDB.values())
-  if (u.rol === 'federal_agent') lista = lista.filter(c => c.agentesAsignados.includes(u.username) || c.creadoPor === u.username)
+  
+  // Filtrar según acceso del usuario
+  if (!['command_staff', 'supervisory'].includes(u.rol)) {
+    lista = lista.filter(c => canAccessCaso(c, u.username, u.rol))
+  }
+  
   if (u.rol === 'visitante') lista = lista.filter(c => c.clasificacion !== 'confidencial')
   if (estado) lista = lista.filter(c => c.estado === estado)
   if (unidad) lista = lista.filter(c => c.unidad === unidad)
@@ -34,6 +39,7 @@ export async function POST(req: NextRequest) {
     tipo, estado:'abierto', prioridad: prioridad||'media',
     unidad: unidad||'General', agenteLead: u.username,
     agentesAsignados: agentesAsignados||[u.username],
+    agentesAcceso: agentesAsignados||[u.username],
     sospechosos:[], evidencias:[], notas:[], timeline:[
       { id:uuid().slice(0,8), fecha:now, accion:'Caso abierto', detalle:`Caso creado por ${u.nombre||u.username}`, autor:u.username }
     ],

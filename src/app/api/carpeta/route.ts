@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, isUserFrozen, frozen } from '@/lib/auth'
-import { canAccessCarpetaHilo, getCarpeta, persistCarpeta, type HiloCarpeta } from '@/lib/carpeta-db'
+import { canAccessCarpetaHilo, canAccessCarpeta, getCarpeta, persistCarpeta, type HiloCarpeta } from '@/lib/carpeta-db'
 import { getDB } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
@@ -70,10 +70,15 @@ export async function GET(req: NextRequest) {
     targetUsername = matched?.username || null
   }
 
-  // If requesting another user's carpeta, require supervisory or command_staff
+  // If requesting another user's carpeta, validate access
   if (targetUsername && targetUsername !== u.username) {
-    if (!isElevated) return forbidden()
     const carpeta = await getCarpeta(targetUsername)
+    
+    // Check if user has access to this carpeta
+    if (!canAccessCarpeta(carpeta, u.username, u.rol)) {
+      return forbidden()
+    }
+    
     return NextResponse.json({
       ...carpeta,
       anotaciones: carpeta.anotaciones.filter((a: any) => !a.privada),

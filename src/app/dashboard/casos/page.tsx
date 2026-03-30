@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Plus, RefreshCw, X, ChevronRight, AlertCircle, CheckCircle, FileText, Clock, Shield, Send, MessageCircle } from 'lucide-react'
-import { getCasos, getCaso, getStoredUser, crearCaso, editarCaso, borrarCaso, subscribeStoredUser } from '@/lib/client'
+import { Plus, RefreshCw, X, ChevronRight, AlertCircle, CheckCircle, FileText, Clock, Shield, Send, MessageCircle, Users, Lock, Trash } from 'lucide-react'
+import { getCasos, getCaso, getStoredUser, crearCaso, editarCaso, borrarCaso, addAgentToCaso, removeAgentFromCaso, subscribeStoredUser, getPersonal } from '@/lib/client'
 import { Toast, ToastType } from '@/components/Toast'
 import { TableSkeleton } from '@/components/Skeleton'
 
@@ -37,6 +37,86 @@ function normalizeEvidenceUrl(raw: string) {
 function isRenderableImageUrl(raw: string) {
   const input = String(raw || '').trim()
   return /^https?:\/\//i.test(input) && /(imgur\.com|\.(png|jpg|jpeg|webp|gif)(\?.*)?)$/i.test(input)
+}
+
+// ── Personal search dropdown ────────────────────────────────────────────
+import { Search } from 'lucide-react'
+
+function PersonalSearchDropdown({ onSelect, placeholder = 'Buscar agente...' }: { onSelect: (agente: any) => void; placeholder?: string }) {
+  const [query, setQuery]       = useState('')
+  const [results, setResults]   = useState<any[]>([])
+  const [open, setOpen]         = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const containerRef            = useRef<HTMLDivElement>(null)
+  const debounceRef             = useRef<ReturnType<typeof setTimeout>>()
+
+  const search = useCallback(async (q: string) => {
+    if (!q.trim()) { setResults([]); return }
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('fib_token') || ''
+      const res = await fetch(`/api/personal?q=${encodeURIComponent(q)}&estado=Activo`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      setResults(data.agentes || [])
+    } catch { setResults([]) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => search(query), 300)
+    return () => clearTimeout(debounceRef.current)
+  }, [query, search])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center gap-2 bg-bg-surface border border-bg-border focus-within:border-accent-blue transition-colors">
+        <Search size={12} className="ml-3 text-tx-muted shrink-0" />
+        <input
+          className="flex-1 bg-transparent px-2 py-2 text-sm text-tx-primary placeholder-tx-muted focus:outline-none"
+          placeholder={placeholder}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+        />
+        {loading && <div className="mr-3 w-3 h-3 border border-accent-blue/40 border-t-accent-blue rounded-full animate-spin shrink-0" />}
+      </div>
+      {open && (query.trim() || results.length > 0) && (
+        <div className="absolute top-full left-0 right-0 z-50 bg-bg-card border border-bg-border shadow-xl mt-0.5 max-h-52 overflow-y-auto">
+          {results.length === 0 && query.trim() && !loading && (
+            <p className="px-3 py-2.5 font-mono text-[10px] text-tx-muted">Sin resultados para "{query}"</p>
+          )}
+          {results.map((a: any) => (
+            <button
+              key={a.id || a.numero}
+              onClick={() => { onSelect(a); setQuery(''); setResults([]); setOpen(false) }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-bg-hover transition-colors text-left border-b border-bg-border/50 last:border-0"
+            >
+              <div className="w-6 h-6 bg-accent-blue/20 border border-accent-blue/30 flex items-center justify-center shrink-0">
+                <span className="font-display text-[9px] font-bold text-accent-blue uppercase">{a.nombre?.[0]}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-tx-primary font-medium truncate">{a.nombre}</p>
+                <p className="font-mono text-[8px] text-tx-muted">{a.rango} · #{a.numero}</p>
+              </div>
+              <span className={`tag text-[8px] border ${a.estado==='Activo'?'border-green-700 text-green-400':'border-gray-700 text-gray-400'}`}>{a.estado}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Create caso modal — full form ─────────────────────────────────────────
@@ -259,10 +339,80 @@ function CasoChat({ casoId, user, notas, canEdit, onAddNota }: {
   )
 }
 
+// ── Manage case access modal ────────────────────────────────────────────────
+function ModalGestionarAcceso({ casoId, agentesAcceso, onClose, onUpdate, onError }: { casoId:string; agentesAcceso:string[]; onClose:()=>void; onUpdate:(m:string)=>void; onError:(m:string)=>void }) {
+  const [loading, setLoading] = useState(false)
+
+  async function addAgent(agente: any) {
+    const username = agente.username || agente.nombre?.toLowerCase()
+    if (!username) return
+    setLoading(true)
+    try {
+      await addAgentToCaso(casoId, username)
+      onUpdate(`Acceso otorgado a ${agente.nombre}`)
+    } catch(e:any) {
+      onError(e.message || 'Error al agregar agente')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function removeAgent(agentUsername: string) {
+    setLoading(true)
+    try {
+      await removeAgentFromCaso(casoId, agentUsername)
+      onUpdate(`Acceso revocado a ${agentUsername}`)
+    } catch(e:any) {
+      onError(e.message || 'Error al remover agente')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border">
+          <div><span className="section-tag">// Gestionar Acceso</span><p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Control de Acceso</p></div>
+          <button onClick={onClose} className="text-tx-muted hover:text-tx-primary"><X size={15}/></button>
+        </div>
+        <div className="p-5 flex flex-col gap-4">
+          <div>
+            <p className="text-xs text-tx-secondary mb-3">Agentes con acceso actual:</p>
+            {agentesAcceso.length === 0 ? (
+              <p className="font-mono text-[9px] text-tx-muted">Sin agentes</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {agentesAcceso.map(agent => (
+                  <div key={agent} className="flex items-center gap-2 px-2 py-1 bg-accent-blue/10 border border-accent-blue/30 rounded text-xs">
+                    <span>{agent}</span>
+                    <button 
+                      onClick={() => removeAgent(agent)}
+                      disabled={loading}
+                      className="hover:text-red-400 disabled:opacity-50"
+                    >
+                      <X size={12}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-tx-secondary mb-2">Agregar agente:</p>
+            <PersonalSearchDropdown onSelect={addAgent} placeholder="Buscar agente..." />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Case modal — tabbed with friendly chat ────────────────────────────────
 function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId:string; user:any; onClose:()=>void; onUpdate:(m:string)=>void; onError:(m:string)=>void }) {
   const [caso, setCaso]   = useState<any>(null)
   const [tab,  setTab]    = useState<'chat'|'info'|'sospechosos'|'evidencia'|'timeline'>('chat')
+  const [showAccessModal, setShowAccessModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const isCS    = user?.rol === 'command_staff'
   const isSuperv= ['command_staff','supervisory'].includes(user?.rol)
@@ -304,7 +454,14 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId:string
             <h2 className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary truncate">{caso.titulo}</h2>
             <p className="font-mono text-[8px] text-tx-muted mt-0.5">{caso.tipo} · {caso.unidad} · Lead: {caso.agenteLead}</p>
           </div>
-          <button onClick={onClose} className="text-tx-muted hover:text-tx-primary shrink-0 mt-0.5"><X size={15}/></button>
+          <div className="flex items-center gap-2 shrink-0 mt-0.5">
+            {isSuperv && (
+              <button onClick={() => setShowAccessModal(true)} title="Gestionar acceso" className="text-tx-muted hover:text-accent-blue transition-colors">
+                <Users size={15}/>
+              </button>
+            )}
+            <button onClick={onClose} className="text-tx-muted hover:text-tx-primary"><X size={15}/></button>
+          </div>
         </div>
 
         {/* Status change bar (only if canEdit) */}
@@ -456,6 +613,19 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId:string
           )}
         </div>
       </div>
+      {showAccessModal && (
+        <ModalGestionarAcceso 
+          casoId={casoId} 
+          agentesAcceso={caso.agentesAcceso}
+          onClose={() => setShowAccessModal(false)} 
+          onUpdate={m => { 
+            onUpdate(m); 
+            loadCaso(); 
+            setShowAccessModal(false) 
+          }} 
+          onError={onError}
+        />
+      )}
     </div>
   )
 }

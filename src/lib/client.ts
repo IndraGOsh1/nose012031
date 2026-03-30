@@ -152,6 +152,8 @@ export const getCaso    = (id:string) => api<any>(`/casos/${id}`)
 export const crearCaso  = (b:any) => api<any>('/casos',{method:'POST',body:JSON.stringify(b)})
 export const editarCaso = (id:string,b:any) => api<any>(`/casos/${id}`,{method:'PATCH',body:JSON.stringify(b)})
 export const borrarCaso = (id:string) => api<any>(`/casos/${id}`,{method:'DELETE'})
+export const addAgentToCaso = (id:string,agent:string) => api<any>(`/casos/${id}/access?agent=${encodeURIComponent(agent)}`,{method:'POST'})
+export const removeAgentFromCaso = (id:string,agent:string) => api<any>(`/casos/${id}/access?agent=${encodeURIComponent(agent)}`,{method:'DELETE'})
 
 // Allanamientos
 export const getAllanamientos    = (p?:Record<string,string>) => api<any>('/allanamientos'+(p?'?'+new URLSearchParams(p):''))
@@ -182,6 +184,8 @@ export const borrarCarpetaItem = (tipo:string,id:string) => api<any>('/carpeta',
 export const crearHiloCarpeta  = (b:any, username?:string) => api<any>(`/carpeta${username ? `?username=${encodeURIComponent(username)}` : ''}`,{method:'POST',body:JSON.stringify({tipo:'hilo',...b})})
 export const enviarMensajeHiloCarpeta = (hiloId:string, contenido:string, username?:string) => api<any>(`/carpeta${username ? `?username=${encodeURIComponent(username)}` : ''}`,{method:'POST',body:JSON.stringify({tipo:'hilo_mensaje',hiloId,contenido})})
 export const setEstadoHiloCarpeta = (hiloId:string, estado:'abierto'|'cerrado', username?:string) => api<any>(`/carpeta${username ? `?username=${encodeURIComponent(username)}` : ''}`,{method:'POST',body:JSON.stringify({tipo:'hilo_estado',hiloId,estado})})
+export const addAgentToCarpeta = (username:string, agent:string) => api<any>(`/carpeta/${encodeURIComponent(username)}/access?agent=${encodeURIComponent(agent)}`,{method:'POST'})
+export const removeAgentFromCarpeta = (username:string, agent:string) => api<any>(`/carpeta/${encodeURIComponent(username)}/access?agent=${encodeURIComponent(agent)}`,{method:'DELETE'})
 
 // Config visual
 export const getConfigVisual   = async () => {

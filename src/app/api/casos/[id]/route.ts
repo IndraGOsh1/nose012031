@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
-import { deleteCasoById, getCasosDB, persistCaso } from '@/lib/casos-db'
+import { deleteCasoById, getCasosDB, persistCaso, canAccessCaso } from '@/lib/casos-db'
 
 const ESTADOS = new Set(['abierto', 'en_progreso', 'cerrado', 'archivado'])
 const PRIORIDADES = new Set(['baja', 'media', 'alta', 'critica'])
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const CasosDB = await getCasosDB()
   const c = CasosDB.get(id); if (!c) return notFound()
-  if (c.clasificacion==='confidencial' && u.rol!=='command_staff' && !c.agentesAsignados.includes(u.username)) return forbidden()
+  if (!canAccessCaso(c, u.username, u.rol)) return forbidden()
   return NextResponse.json(c)
 }
 

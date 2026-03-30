@@ -42,6 +42,7 @@ export interface CarpetaPersonal {
   anotaciones: Anotacion[]
   documentos: CarpetaDocumento[]
   hilos: HiloCarpeta[]
+  acceso: string[]
 }
 
 declare global {
@@ -90,13 +91,47 @@ export async function getCarpetasDB() {
 export async function getCarpeta(username: string): Promise<CarpetaPersonal> {
   const db = await getCarpetasDB()
   if (!db.has(username)) {
-    await persistentMapSet(db, username, { username, anotaciones: [], documentos: [], hilos: [] })
+    await persistentMapSet(db, username, { username, anotaciones: [], documentos: [], hilos: [], acceso: [] })
   }
   return db.get(username) as CarpetaPersonal
 }
 
 export function canAccessCarpetaHilo(hilo: HiloCarpeta, viewerUsername: string, ownerUsername: string) {
   return viewerUsername === ownerUsername || hilo.participantes.includes(viewerUsername)
+}
+
+/**
+ * Verifica si un usuario puede acceder a la carpeta de otro usuario.
+ * Admin/Supervisor: acceso total
+ * Otros: solo si están en la lista de acceso de la carpeta
+ */
+export function canAccessCarpeta(carpeta: CarpetaPersonal, username: string, userRole: string): boolean {
+  if (['command_staff', 'supervisory'].includes(userRole)) return true
+  return carpeta.username === username || carpeta.acceso.includes(username)
+}
+
+/**
+ * Agrega un agente al acceso de la carpeta
+ */
+export async function addAgentAccessCarpeta(ownerUsername: string, agentUsername: string) {
+  const db = await getCarpetasDB()
+  const carpeta = db.get(ownerUsername)
+  if (!carpeta) throw new Error('Carpeta no encontrada')
+  if (!carpeta.acceso.includes(agentUsername)) {
+    carpeta.acceso.push(agentUsername)
+    await persistentMapSet(db, ownerUsername, carpeta)
+  }
+}
+
+/**
+ * Revoca acceso de un agente a la carpeta
+ */
+export async function removeAgentAccessCarpeta(ownerUsername: string, agentUsername: string) {
+  const db = await getCarpetasDB()
+  const carpeta = db.get(ownerUsername)
+  if (!carpeta) throw new Error('Carpeta no encontrada')
+  carpeta.acceso = carpeta.acceso.filter(u => u !== agentUsername)
+  await persistentMapSet(db, ownerUsername, carpeta)
 }
 
 export async function persistCarpeta(carpeta: CarpetaPersonal) {
