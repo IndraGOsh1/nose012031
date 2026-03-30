@@ -439,6 +439,7 @@ export default function CarpetaPage() {
   const [threadForm, setThreadForm] = useState({ titulo:'', descripcion:'', participantes:'' })
   const [threadReply, setThreadReply] = useState('')
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
+  const [showAccessModal, setShowAccessModal] = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [expanded, setExpanded] = useState<string|null>(null)
   // For command/supervisory: viewing another agent's carpeta
@@ -1029,13 +1030,13 @@ export default function CarpetaPage() {
           )}
         </div>
       )}
-      {showAccessModal && carpeta && (
+      {showAccessModal && carpeta && agente && (
         <ModalGestionarAccesoCarpeta 
           ownerUsername={agente.username || agente.nombre}
           acceso={carpeta.acceso || []}
           onClose={() => setShowAccessModal(false)} 
           onUpdate={m => { 
-            loadCarpeta(); 
+            recargarCarpeta(); 
             setShowAccessModal(false) 
           }} 
           onError={console.error}
