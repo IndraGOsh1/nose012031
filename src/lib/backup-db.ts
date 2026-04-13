@@ -7,7 +7,9 @@ import { createClient } from '@supabase/supabase-js'
 import { getSecret } from './secrets'
 
 // ── Allowed owner username (always has access without a code) ─────────────
-export const BACKUP_OWNER_USERNAME = 'indra'
+// Configurable via BACKUP_OWNER env variable; defaults to 'indra'
+export const BACKUP_OWNER_USERNAME =
+  (process.env.BACKUP_OWNER || '').trim().toLowerCase() || 'indra'
 
 // ── Crypto-safe random code generator ────────────────────────────────────
 function generateCode(): string {

@@ -7,6 +7,7 @@ import {
   Copy,
   RefreshCw,
   Key,
+  X as XIcon,
   Users,
   CheckCircle,
   Shield,
@@ -693,7 +694,7 @@ export default function AdminPage() {
                 </p>
               </div>
               <button onClick={() => setPwdResetTarget(null)} className="text-tx-muted hover:text-tx-primary">
-                <Key size={15} />
+                <XIcon size={15} />
               </button>
             </div>
             <form onSubmit={handlePwdReset} className="p-5 flex flex-col gap-4">
