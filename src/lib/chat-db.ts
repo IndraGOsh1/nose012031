@@ -150,8 +150,9 @@ export const ChatDB = new Proxy({} as typeof global.__fibChatV2 & {}, {
 
 export function canAccess(canal: Canal, rol: string, username: string): boolean {
   if (canal.tipo === 'dm' || canal.tipo === 'private') return canal.participantes?.includes(username) || false
-  if (canal.acceso.includes('*')) return true
-  return canal.acceso.includes(rol)
+  const acceso = canal.acceso ?? []
+  if (acceso.includes('*')) return true
+  return acceso.includes(rol)
 }
 
 async function persistCanal(canal: Canal) {
