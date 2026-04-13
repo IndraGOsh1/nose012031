@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser, unauthorized, forbidden } from '@/lib/auth'
-import { getCarpetasDB } from '@/lib/carpeta-db'
 
 /**
  * Roles con acceso privilegiado a cualquier carpeta personal.
@@ -53,13 +52,6 @@ export async function canAccessFolder(
   // Condición 2: el usuario tiene rol de staff con acceso global
   if ((STAFF_ROLES as readonly string[]).includes(user.rol)) return null
 
-  // Consultar la BD para confirmar que la carpeta pertenece al agente indicado
-  const db = await getCarpetasDB()
-  const carpeta = db.get(agentId)
-
-  // Si la carpeta no existe y el usuario no tiene permisos suficientes → 403
-  if (!carpeta) return forbidden()
-
-  // La carpeta existe pero el usuario no es dueño ni staff → 403
+  // El usuario no es dueño ni staff: acceso denegado
   return forbidden()
 }

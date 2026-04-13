@@ -49,7 +49,10 @@ export async function POST(
     )
   }
 
-  // Vincular la carpeta fuente al agente destino (se copia bajo el nuevo username)
+  // Vincular la carpeta fuente al agente destino.
+  // Nota: si el agente destino ya tiene una carpeta, esta operación la reemplaza
+  // intencionalmente, ya que "assign" está diseñada para ser una operación
+  // administrativa explícita de reasignación (solo accesible por staff).
   const linked = { ...sourceFolder, username: agentId }
   await persistentMapSet(db, agentId, linked)
 
