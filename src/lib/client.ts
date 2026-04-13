@@ -133,6 +133,7 @@ export const borrarInvite = (codigo:string) => api<any>('/invite',{method:'DELET
 // Users
 export const getUsers   = (p?:Record<string,string>) => api<any>('/users'+(p?'?'+new URLSearchParams(p):''))
 export const editarUser = (id:string,b:any) => api<any>(`/users/${id}`,{method:'PATCH',body:JSON.stringify(b)})
+export const resetUserPassword = (id:string,newPassword:string) => api<any>(`/users/${id}`,{method:'PATCH',body:JSON.stringify({newPassword})})
 export const borrarUser = (id:string) => api<any>(`/users/${id}`,{method:'DELETE'})
 
 // Operativos
