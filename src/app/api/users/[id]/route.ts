@@ -4,7 +4,7 @@ import { getUser, unauthorized, forbidden, notFound } from '@/lib/auth'
 import { deleteUserById, getDB, listUsersFresh, persistUser, type Rol } from '@/lib/db'
 import { cacheMapDelete, cacheMapSet } from '@/lib/supabase-map'
 import { logKeyAction, logRegistroImportante } from '@/lib/webhook'
-import { getRequestIp, isStrongEnoughPassword, rateLimit } from '@/lib/security'
+import { isStrongEnoughPassword, rateLimit } from '@/lib/security'
 
 const ROLES: Rol[] = ['command_staff', 'supervisory', 'federal_agent', 'visitante']
 const VALID_CLASSES = ['RRHH', 'CIRG', 'Task Force', 'UO', 'General']
@@ -24,9 +24,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // command_staff can reset any account's password (except their own).
   // supervisory can only reset federal_agent and visitante accounts.
   if (newPassword !== undefined) {
-    const ip = getRequestIp(req)
-    const rlKey = `pwd_reset:${u.id}:${ip}`
-    const limit = rateLimit({ key: rlKey, max: 10, windowMs: 60_000 })
+    // Rate-limit per admin user (not per IP, to avoid shared-IP collisions in office networks)
+    const limit = rateLimit({ key: `pwd_reset:${u.id}`, max: 10, windowMs: 60_000 })
     if (!limit.ok) {
       return NextResponse.json({ error: `Demasiados intentos. Reintenta en ${limit.retryAfterSec}s` }, { status: 429 })
     }

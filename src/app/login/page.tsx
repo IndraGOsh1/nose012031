@@ -147,7 +147,7 @@ export default function LoginPage() {
                 <label className="label">Código de Invitación</label>
                 <div className="relative">
                   <Key size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-tx-muted" />
-                  <input className="input pl-8 uppercase tracking-widest" value={form.codigo} onChange={set('codigo')} placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" required autoComplete="off" />
+                  <input className="input pl-8 uppercase tracking-widest" value={form.codigo} onChange={set('codigo')} placeholder="Código de invitación" required autoComplete="off" />
                 </div>
                 <p className="font-mono text-[8px] text-tx-muted mt-1.5">Emitido por Command Staff. Un solo uso.</p>
               </div>

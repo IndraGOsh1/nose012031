@@ -416,6 +416,20 @@ export default function AdminPage() {
     }
   }
 
+  function closePwdResetModal() {
+    setPwdResetTarget(null)
+    setPwdResetValue('')
+    setPwdResetConfirm('')
+    setPwdResetShow(false)
+  }
+
+  function openPwdResetModal(u: { id: string; username: string; rol: string }) {
+    setPwdResetTarget(u)
+    setPwdResetValue('')
+    setPwdResetConfirm('')
+    setPwdResetShow(false)
+  }
+
   async function handlePwdReset(e: React.FormEvent) {
     e.preventDefault()
     if (!pwdResetTarget || !pwdResetValue.trim() || pwdResetBusy) return
@@ -427,10 +441,7 @@ export default function AdminPage() {
     try {
       await resetUserPassword(pwdResetTarget.id, pwdResetValue.trim())
       setToast({ msg: `✅ Contraseña restablecida para @${pwdResetTarget.username}`, ok: true })
-      setPwdResetTarget(null)
-      setPwdResetValue('')
-      setPwdResetConfirm('')
-      setPwdResetShow(false)
+      closePwdResetModal()
     } catch (e: any) {
       setToast({ msg: e.message || 'Error al restablecer contraseña', ok: false })
     } finally {
@@ -696,7 +707,7 @@ export default function AdminPage() {
 
       {/* ── Password reset modal ──────────────────────────────────────────── */}
       {pwdResetTarget && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && (setPwdResetTarget(null), setPwdResetValue(''), setPwdResetConfirm(''), setPwdResetShow(false))}>
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && closePwdResetModal()}>
           <div className="bg-bg-card border border-bg-border w-full max-w-sm shadow-2xl animate-fade-up">
             {/* header accent */}
             <div className="h-0.5 bg-gradient-to-r from-transparent via-yellow-500 to-transparent" />
@@ -712,7 +723,7 @@ export default function AdminPage() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => (setPwdResetTarget(null), setPwdResetValue(''), setPwdResetConfirm(''), setPwdResetShow(false))} className="text-tx-muted hover:text-tx-primary transition-colors">
+              <button onClick={closePwdResetModal} className="text-tx-muted hover:text-tx-primary transition-colors">
                 <XIcon size={15} />
               </button>
             </div>
@@ -759,6 +770,7 @@ export default function AdminPage() {
                   <input
                     type={pwdResetShow ? 'text' : 'password'}
                     className={`input pr-9 ${pwdResetConfirm.length > 0 && pwdResetConfirm !== pwdResetValue ? 'border-red-700 focus:border-red-500' : ''}`}
+                    aria-invalid={pwdResetConfirm.length > 0 && pwdResetConfirm !== pwdResetValue}
                     value={pwdResetConfirm}
                     onChange={e => setPwdResetConfirm(e.target.value)}
                     placeholder="Repite la contraseña"
@@ -774,6 +786,9 @@ export default function AdminPage() {
                     </span>
                   )}
                 </div>
+                {pwdResetConfirm.length > 0 && pwdResetConfirm !== pwdResetValue && (
+                  <p className="font-mono text-[8px] text-red-400 mt-1">Las contraseñas no coinciden</p>
+                )}
               </div>
 
               <p className="font-mono text-[8px] text-tx-dim">
@@ -783,7 +798,7 @@ export default function AdminPage() {
               <div className="flex gap-2 justify-end pt-1">
                 <button
                   type="button"
-                  onClick={() => (setPwdResetTarget(null), setPwdResetValue(''), setPwdResetConfirm(''), setPwdResetShow(false))}
+                  onClick={closePwdResetModal}
                   className="btn-ghost py-1.5 px-4 text-[9px]"
                 >
                   Cancelar
@@ -920,7 +935,7 @@ export default function AdminPage() {
                       <button onClick={() => toggleFreeze(u.id, u.username, !!u.congelado)} className={`font-mono text-[8px] tracking-widest uppercase px-2 py-1 border ${u.congelado ? 'border-green-800 text-green-400' : 'border-cyan-800 text-cyan-400'}`} title={u.congelado ? `Motivo: ${u.congeladoReason || '—'}` : 'Solo lectura: puede ver todo pero no escribir'}>{u.congelado ? 'Descongelar' : 'Congelar'}</button>
                       {canResetThisUser && (
                         <button
-                          onClick={() => { setPwdResetTarget({ id: u.id, username: u.username, rol: u.rol }); setPwdResetValue(''); setPwdResetConfirm(''); setPwdResetShow(false) }}
+                          onClick={() => openPwdResetModal({ id: u.id, username: u.username, rol: u.rol })}
                           className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400 hover:bg-yellow-900/20 transition-colors"
                           title="Restablecer contraseña"
                         >Reset PSW</button>
@@ -930,7 +945,7 @@ export default function AdminPage() {
                     {!isCS && canResetPasswords && <td className="table-cell">
                       {canResetThisUser && (
                         <button
-                          onClick={() => { setPwdResetTarget({ id: u.id, username: u.username, rol: u.rol }); setPwdResetValue(''); setPwdResetConfirm(''); setPwdResetShow(false) }}
+                          onClick={() => openPwdResetModal({ id: u.id, username: u.username, rol: u.rol })}
                           className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400 hover:bg-yellow-900/20 transition-colors"
                           title="Restablecer contraseña"
                         >Reset PSW</button>
