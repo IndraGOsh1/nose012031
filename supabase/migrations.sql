@@ -318,10 +318,14 @@ CREATE TABLE IF NOT EXISTS carpetas (
   username    TEXT PRIMARY KEY,
   anotaciones JSONB NOT NULL DEFAULT '[]'::jsonb,
   documentos  JSONB NOT NULL DEFAULT '[]'::jsonb,
-  hilos       JSONB NOT NULL DEFAULT '[]'::jsonb
+  hilos       JSONB NOT NULL DEFAULT '[]'::jsonb,
+  acceso      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  supervisor  TEXT
 );
 
-ALTER TABLE carpetas ADD COLUMN IF NOT EXISTS hilos JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE carpetas ADD COLUMN IF NOT EXISTS hilos       JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE carpetas ADD COLUMN IF NOT EXISTS acceso     JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE carpetas ADD COLUMN IF NOT EXISTS supervisor TEXT;
 
 -- ── Audit Logs ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -357,6 +361,12 @@ CREATE TABLE IF NOT EXISTS bot_keys (
 
 CREATE INDEX IF NOT EXISTS idx_bot_keys_created_at_desc ON bot_keys ("createdAt" DESC);
 CREATE INDEX IF NOT EXISTS idx_bot_keys_revoked ON bot_keys ("revokedAt");
+
+-- ── Backup Config ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS backup_config (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 
 -- If using SUPABASE_SERVICE_ROLE_KEY, RLS is bypassed automatically.
 -- If using anon key, uncomment and adjust these policies:
