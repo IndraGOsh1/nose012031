@@ -43,6 +43,8 @@ export interface CarpetaPersonal {
   documentos: CarpetaDocumento[]
   hilos: HiloCarpeta[]
   acceso: string[]
+  /** Username del supervisor designado para revisar esta carpeta */
+  supervisor?: string | null
 }
 
 declare global {
