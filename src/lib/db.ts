@@ -58,16 +58,26 @@ declare global {
 const isSupabaseEnabled = !!(getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)
 
 let _adminClient: ReturnType<typeof createClient> | null = null
+// eslint-disable-next-line no-var
+declare global { var __fibDbKeyWarned: boolean | undefined }
 
 function getAdminClient() {
   if (_adminClient) return _adminClient
   const url = getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  const key =
-    getSecret('SUPABASE_SERVICE_ROLE_KEY') ||
+  const serviceKey = getSecret('SUPABASE_SERVICE_ROLE_KEY')
+  const publicFallback =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     ''
+  const key = serviceKey || publicFallback
   if (!url || !key) return null
+  if (!serviceKey && publicFallback && process.env.NODE_ENV === 'production' && !global.__fibDbKeyWarned) {
+    console.warn(
+      '[db] ADVERTENCIA: usando clave pública (NEXT_PUBLIC_*) para operaciones de administración. ' +
+      'Configura SUPABASE_SERVICE_ROLE_KEY para mayor seguridad.',
+    )
+    global.__fibDbKeyWarned = true
+  }
   _adminClient = createClient(url, key)
   return _adminClient
 }

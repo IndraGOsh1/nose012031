@@ -14,10 +14,11 @@ body {
   overflow-x: hidden;
 }
 
-::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #07090B; }
-::-webkit-scrollbar-thumb { background: #1B6FFF; border-radius: 2px; }
-::selection { background: rgba(27,111,255,0.25); }
+::-webkit-scrollbar-thumb { background: #1B6FFF55; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #1B6FFF; }
+::selection { background: rgba(27,111,255,0.3); color: #fff; }
 
 @layer components {
   .btn { @apply font-display font-medium tracking-widest uppercase text-xs px-5 py-2.5 transition-all duration-150 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed; }
@@ -42,7 +43,7 @@ body {
 @layer utilities {
   .dashboard-enter {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.97);
     transition:
       opacity 420ms ease,
       transform 520ms cubic-bezier(0.22, 1, 0.36, 1);

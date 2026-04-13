@@ -4,7 +4,7 @@ import { getUser, unauthorized, forbidden, notFound } from '@/lib/auth'
 import { deleteUserById, getDB, listUsersFresh, persistUser, type Rol } from '@/lib/db'
 import { cacheMapDelete, cacheMapSet } from '@/lib/supabase-map'
 import { logKeyAction, logRegistroImportante } from '@/lib/webhook'
-import { isStrongEnoughPassword } from '@/lib/security'
+import { getRequestIp, isStrongEnoughPassword, rateLimit } from '@/lib/security'
 
 const ROLES: Rol[] = ['command_staff', 'supervisory', 'federal_agent', 'visitante']
 const VALID_CLASSES = ['RRHH', 'CIRG', 'Task Force', 'UO', 'General']
@@ -20,11 +20,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { rol, activo, discordId, agentNumber, nombre, callsign, vetado, vetoReason, congelado, congeladoReason, clases, newPassword } = await req.json().catch(()=>({}))
   const nextUser = { ...usr }
 
-  // ── Password reset (supervisory+ can only reset federal_agent / visitante) ─────
+  // ── Password reset ──────────────────────────────────────────────────────────
+  // command_staff can reset any account's password (except their own).
+  // supervisory can only reset federal_agent and visitante accounts.
   if (newPassword !== undefined) {
+    const ip = getRequestIp(req)
+    const rlKey = `pwd_reset:${u.id}:${ip}`
+    const limit = rateLimit({ key: rlKey, max: 10, windowMs: 60_000 })
+    if (!limit.ok) {
+      return NextResponse.json({ error: `Demasiados intentos. Reintenta en ${limit.retryAfterSec}s` }, { status: 429 })
+    }
+
     const targetRole: Rol = usr.rol
-    if (!['federal_agent', 'visitante'].includes(targetRole)) {
-      return NextResponse.json({ error: 'Solo se puede restablecer la contraseña de agentes federales y visitantes' }, { status: 403 })
+    const canResetTarget =
+      u.rol === 'command_staff'
+        ? true                                                     // CS can reset any account
+        : ['federal_agent', 'visitante'].includes(targetRole)      // Supervisory: only lower roles
+
+    if (!canResetTarget) {
+      return NextResponse.json({ error: 'Sin permisos para restablecer esta contraseña' }, { status: 403 })
     }
     if (usr.id === u.id) {
       return NextResponse.json({ error: 'No puedes resetear tu propia contraseña desde aquí' }, { status: 400 })

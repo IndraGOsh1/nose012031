@@ -191,20 +191,33 @@ export default function DashboardHome() {
       {/* Header */}
       <div className="page-header">
         <span className="section-tag">// Panel de Control</span>
-        <h1 className="font-display text-2xl font-semibold tracking-wider uppercase text-tx-primary mt-1">
+        <h1 className="font-display text-3xl font-semibold tracking-wider uppercase text-tx-primary mt-1">
           Bienvenido{user?.nombre ? `, ${user.nombre}` : user?.username ? `, ${user.username}` : ''}
         </h1>
-        <p className="text-tx-secondary text-sm mt-0.5">Federal Investigation Bureau — Sistema HQ</p>
+        <div className="flex items-center gap-3 mt-1.5">
+          <p className="text-tx-secondary text-sm">Federal Investigation Bureau — Sistema HQ</p>
+          {user?.rol && (
+            <span className={`font-mono text-[8px] tracking-widest uppercase px-2 py-0.5 border ${
+              user.rol === 'command_staff' ? 'border-red-800 text-red-400 bg-red-900/10' :
+              user.rol === 'supervisory'   ? 'border-blue-700 text-blue-400 bg-blue-900/10' :
+              user.rol === 'federal_agent' ? 'border-green-700 text-green-400 bg-green-900/10' :
+              'border-gray-700 text-gray-400'
+            }`}>{user.rol.replace(/_/g, ' ')}</span>
+          )}
+        </div>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-bg-border mb-5">
         {STAT_CARDS.map(c => (
           <Link key={c.label} href={c.href}>
-            <div className="bg-bg-card hover:bg-bg-hover transition-all p-5 group cursor-pointer">
-              <c.icon size={16} className={`${c.color} mb-3 group-hover:scale-110 transition-transform`} />
-              <p className="font-display text-2xl font-semibold text-tx-primary">{loading ? '—' : c.value}</p>
-              <p className="font-mono text-[8px] text-tx-muted tracking-widest uppercase mt-1">{c.label}</p>
+            <div className="bg-bg-card hover:bg-bg-hover transition-all p-5 group cursor-pointer h-full">
+              <div className="flex items-start justify-between mb-3">
+                <c.icon size={16} className={`${c.color} group-hover:scale-110 transition-transform`} />
+                <ChevronRight size={11} className="text-tx-dim group-hover:text-tx-muted transition-colors" />
+              </div>
+              <p className="font-display text-3xl font-bold text-tx-primary leading-none">{loading ? <span className="animate-pulse text-tx-dim">—</span> : c.value}</p>
+              <p className="font-mono text-[8px] text-tx-muted tracking-widest uppercase mt-2">{c.label}</p>
             </div>
           </Link>
         ))}
