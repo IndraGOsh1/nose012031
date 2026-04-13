@@ -134,7 +134,7 @@ export function nextCaseNumber() {
  */
 export function canAccessCaso(caso: Caso, username: string, userRole: string): boolean {
   if (['command_staff', 'supervisory'].includes(userRole)) return true
-  return caso.agentesAcceso.includes(username) || caso.agenteLead === username
+  return (caso.agentesAcceso ?? []).includes(username) || caso.agenteLead === username
 }
 
 /**
@@ -144,6 +144,7 @@ export async function addAgentAccessCaso(casoId: string, agentUsername: string) 
   const db = await getCasosDB()
   const caso = db.get(casoId)
   if (!caso) throw new Error('Caso no encontrado')
+  if (!caso.agentesAcceso) caso.agentesAcceso = []
   if (!caso.agentesAcceso.includes(agentUsername)) {
     caso.agentesAcceso.push(agentUsername)
     await persistentMapSet(db, casoId, caso)
@@ -157,6 +158,6 @@ export async function removeAgentAccessCaso(casoId: string, agentUsername: strin
   const db = await getCasosDB()
   const caso = db.get(casoId)
   if (!caso) throw new Error('Caso no encontrado')
-  caso.agentesAcceso = caso.agentesAcceso.filter(u => u !== agentUsername)
+  caso.agentesAcceso = (caso.agentesAcceso ?? []).filter(u => u !== agentUsername)
   await persistentMapSet(db, casoId, caso)
 }

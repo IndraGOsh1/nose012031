@@ -97,7 +97,7 @@ export async function getCarpeta(username: string): Promise<CarpetaPersonal> {
 }
 
 export function canAccessCarpetaHilo(hilo: HiloCarpeta, viewerUsername: string, ownerUsername: string) {
-  return viewerUsername === ownerUsername || hilo.participantes.includes(viewerUsername)
+  return viewerUsername === ownerUsername || (hilo.participantes ?? []).includes(viewerUsername)
 }
 
 /**
@@ -107,7 +107,7 @@ export function canAccessCarpetaHilo(hilo: HiloCarpeta, viewerUsername: string, 
  */
 export function canAccessCarpeta(carpeta: CarpetaPersonal, username: string, userRole: string): boolean {
   if (['command_staff', 'supervisory'].includes(userRole)) return true
-  return carpeta.username === username || carpeta.acceso.includes(username)
+  return carpeta.username === username || (carpeta.acceso ?? []).includes(username)
 }
 
 /**
@@ -117,6 +117,7 @@ export async function addAgentAccessCarpeta(ownerUsername: string, agentUsername
   const db = await getCarpetasDB()
   const carpeta = db.get(ownerUsername)
   if (!carpeta) throw new Error('Carpeta no encontrada')
+  if (!carpeta.acceso) carpeta.acceso = []
   if (!carpeta.acceso.includes(agentUsername)) {
     carpeta.acceso.push(agentUsername)
     await persistentMapSet(db, ownerUsername, carpeta)
@@ -130,7 +131,7 @@ export async function removeAgentAccessCarpeta(ownerUsername: string, agentUsern
   const db = await getCarpetasDB()
   const carpeta = db.get(ownerUsername)
   if (!carpeta) throw new Error('Carpeta no encontrada')
-  carpeta.acceso = carpeta.acceso.filter(u => u !== agentUsername)
+  carpeta.acceso = (carpeta.acceso ?? []).filter(u => u !== agentUsername)
   await persistentMapSet(db, ownerUsername, carpeta)
 }
 
