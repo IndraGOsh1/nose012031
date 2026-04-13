@@ -16,6 +16,10 @@ import {
   ImagePlus,
   Settings2,
   Globe,
+  Eye,
+  EyeOff,
+  Lock,
+  AlertCircle,
 } from 'lucide-react'
 import {
   getStoredUser,
@@ -128,6 +132,8 @@ export default function AdminPage() {
   // Password reset state
   const [pwdResetTarget, setPwdResetTarget] = useState<{ id: string; username: string; rol: string } | null>(null)
   const [pwdResetValue, setPwdResetValue] = useState('')
+  const [pwdResetConfirm, setPwdResetConfirm] = useState('')
+  const [pwdResetShow, setPwdResetShow] = useState(false)
   const [pwdResetBusy, setPwdResetBusy] = useState(false)
   const [formsData, setFormsData] = useState<{ forms: any[]; canManage: boolean; config?: any }>({ forms: [], canManage: false })
   const [builder, setBuilder] = useState<any>(EMPTY_FORM)
@@ -152,7 +158,7 @@ export default function AdminPage() {
   const isCS = user?.rol === 'command_staff'
   const isSuperv = user?.rol === 'supervisory'
   const canManageForms = ['command_staff', 'supervisory'].includes(user?.rol)
-  /** Can reset passwords of federal_agent / visitante */
+  /** command_staff can reset any account; supervisory can reset federal_agent / visitante */
   const canResetPasswords = isCS || isSuperv
 
   useEffect(() => {
@@ -410,15 +416,32 @@ export default function AdminPage() {
     }
   }
 
+  function closePwdResetModal() {
+    setPwdResetTarget(null)
+    setPwdResetValue('')
+    setPwdResetConfirm('')
+    setPwdResetShow(false)
+  }
+
+  function openPwdResetModal(u: { id: string; username: string; rol: string }) {
+    setPwdResetTarget(u)
+    setPwdResetValue('')
+    setPwdResetConfirm('')
+    setPwdResetShow(false)
+  }
+
   async function handlePwdReset(e: React.FormEvent) {
     e.preventDefault()
     if (!pwdResetTarget || !pwdResetValue.trim() || pwdResetBusy) return
+    if (pwdResetValue.trim() !== pwdResetConfirm.trim()) {
+      setToast({ msg: 'Las contraseñas no coinciden', ok: false })
+      return
+    }
     setPwdResetBusy(true)
     try {
       await resetUserPassword(pwdResetTarget.id, pwdResetValue.trim())
       setToast({ msg: `✅ Contraseña restablecida para @${pwdResetTarget.username}`, ok: true })
-      setPwdResetTarget(null)
-      setPwdResetValue('')
+      closePwdResetModal()
     } catch (e: any) {
       setToast({ msg: e.message || 'Error al restablecer contraseña', ok: false })
     } finally {
@@ -684,53 +707,106 @@ export default function AdminPage() {
 
       {/* ── Password reset modal ──────────────────────────────────────────── */}
       {pwdResetTarget && (
-        <div className="fixed inset-0 z-[200] bg-black/75 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setPwdResetTarget(null)}>
-          <div className="bg-bg-card border border-bg-border w-full max-w-sm">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && closePwdResetModal()}>
+          <div className="bg-bg-card border border-bg-border w-full max-w-sm shadow-2xl animate-fade-up">
+            {/* header accent */}
+            <div className="h-0.5 bg-gradient-to-r from-transparent via-yellow-500 to-transparent" />
             <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border">
-              <div>
-                <span className="section-tag">// Restablecer Contraseña</span>
-                <p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">
-                  Reset de acceso
-                </p>
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 bg-yellow-500/10 border border-yellow-700/40 flex items-center justify-center">
+                  <Lock size={13} className="text-yellow-400" />
+                </div>
+                <div>
+                  <span className="section-tag text-yellow-400/80">// Restablecer Contraseña</span>
+                  <p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">
+                    Reset de acceso
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setPwdResetTarget(null)} className="text-tx-muted hover:text-tx-primary">
+              <button onClick={closePwdResetModal} className="text-tx-muted hover:text-tx-primary transition-colors">
                 <XIcon size={15} />
               </button>
             </div>
             <form onSubmit={handlePwdReset} className="p-5 flex flex-col gap-4">
-              <div className="bg-bg-surface border border-bg-border px-3 py-2.5">
-                <p className="font-mono text-[9px] text-tx-muted uppercase tracking-widest mb-0.5">Usuario</p>
-                <p className="text-sm text-tx-primary font-medium">@{pwdResetTarget.username}</p>
-                <p className="font-mono text-[8px] text-tx-muted">{pwdResetTarget.rol.replace('_', ' ')}</p>
+              {/* target user info */}
+              <div className="flex items-center gap-3 bg-bg-surface border border-bg-border px-3 py-2.5">
+                <div className="w-8 h-8 bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center font-display text-sm font-bold text-accent-blue">
+                  {pwdResetTarget.username.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm text-tx-primary font-medium leading-tight">@{pwdResetTarget.username}</p>
+                  <p className="font-mono text-[8px] text-tx-muted uppercase tracking-widest">{pwdResetTarget.rol.replace(/_/g, ' ')}</p>
+                </div>
               </div>
+
+              {/* new password */}
               <div>
                 <label className="label">Nueva contraseña</label>
-                <input
-                  type="password"
-                  className="input"
-                  value={pwdResetValue}
-                  onChange={e => setPwdResetValue(e.target.value)}
-                  placeholder="Mínimo 8 caracteres, letras y números"
-                  autoFocus
-                  required
-                  minLength={8}
-                />
-                <p className="font-mono text-[8px] text-tx-dim mt-1.5">
-                  El usuario deberá usar esta contraseña en su próximo inicio de sesión.
-                </p>
+                <div className="relative">
+                  <input
+                    type={pwdResetShow ? 'text' : 'password'}
+                    className="input pr-9"
+                    value={pwdResetValue}
+                    onChange={e => setPwdResetValue(e.target.value)}
+                    placeholder="Mínimo 8 caracteres, letras y números"
+                    autoFocus
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                  <button type="button" tabIndex={-1} onClick={() => setPwdResetShow(s => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-tx-muted hover:text-tx-secondary transition-colors">
+                    {pwdResetShow ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
+                {pwdResetValue.length > 0 && pwdResetValue.length < 8 && (
+                  <p className="font-mono text-[8px] text-yellow-500 mt-1">Mínimo 8 caracteres con letras y números</p>
+                )}
               </div>
-              <div className="flex gap-2 justify-end">
+
+              {/* confirm password */}
+              <div>
+                <label className="label">Confirmar contraseña</label>
+                <div className="relative">
+                  <input
+                    type={pwdResetShow ? 'text' : 'password'}
+                    className={`input pr-9 ${pwdResetConfirm.length > 0 && pwdResetConfirm !== pwdResetValue ? 'border-red-700 focus:border-red-500' : ''}`}
+                    aria-invalid={pwdResetConfirm.length > 0 && pwdResetConfirm !== pwdResetValue}
+                    value={pwdResetConfirm}
+                    onChange={e => setPwdResetConfirm(e.target.value)}
+                    placeholder="Repite la contraseña"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                  {pwdResetConfirm.length > 0 && (
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      {pwdResetConfirm === pwdResetValue
+                        ? <CheckCircle size={13} className="text-green-400" />
+                        : <AlertCircle size={13} className="text-red-400" />}
+                    </span>
+                  )}
+                </div>
+                {pwdResetConfirm.length > 0 && pwdResetConfirm !== pwdResetValue && (
+                  <p className="font-mono text-[8px] text-red-400 mt-1">Las contraseñas no coinciden</p>
+                )}
+              </div>
+
+              <p className="font-mono text-[8px] text-tx-dim">
+                El usuario deberá usar esta contraseña en su próximo inicio de sesión.
+              </p>
+
+              <div className="flex gap-2 justify-end pt-1">
                 <button
                   type="button"
-                  onClick={() => setPwdResetTarget(null)}
-                  className="btn-ghost py-1.5 px-3 text-[9px]"
+                  onClick={closePwdResetModal}
+                  className="btn-ghost py-1.5 px-4 text-[9px]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={pwdResetBusy || pwdResetValue.trim().length < 8}
-                  className="btn-primary py-1.5 px-3 text-[9px] disabled:opacity-50"
+                  disabled={pwdResetBusy || pwdResetValue.trim().length < 8 || pwdResetValue !== pwdResetConfirm}
+                  className="btn-primary py-1.5 px-4 text-[9px]"
                 >
                   {pwdResetBusy ? 'Restableciendo...' : 'Restablecer'}
                 </button>
@@ -742,20 +818,20 @@ export default function AdminPage() {
 
       <div className="page-header">
         <span className="section-tag">// Administración</span>
-        <h1 className="font-display text-xl font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Panel Admin Avanzado</h1>
-        <p className="text-tx-muted text-xs mt-0.5">CRUD completo, permisos, clases, formularios dinámicos y respuestas</p>
+        <h1 className="font-display text-2xl font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Panel Admin</h1>
+        <p className="text-tx-muted text-xs mt-0.5">Gestión de cuentas, permisos, clases, formularios y configuración global</p>
         {isCS && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button className="btn-ghost py-2 px-3 text-[9px]" onClick={() => openExport('csv')}>Exportar CSV global</button>
-            <button className="btn-ghost py-2 px-3 text-[9px]" onClick={() => openExport('html')}>Exportar HTML global</button>
-            <button className="btn-primary py-2 px-3 text-[9px]" onClick={() => openExport('pdf')}>Exportar PDF global</button>
+            <button className="btn-ghost py-1.5 px-3 text-[9px]" onClick={() => openExport('csv')}>Exportar CSV</button>
+            <button className="btn-ghost py-1.5 px-3 text-[9px]" onClick={() => openExport('html')}>Exportar HTML</button>
+            <button className="btn-primary py-1.5 px-3 text-[9px]" onClick={() => openExport('pdf')}>Exportar PDF</button>
           </div>
         )}
       </div>
 
-      <div className="flex border-b border-bg-border mb-5 flex-wrap">
+      <div className="flex border-b border-bg-border mb-5 flex-wrap gap-0 overflow-x-auto">
         {visibleTabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-4 py-2.5 font-mono text-[9px] tracking-widest uppercase transition-all border-b-2 -mb-px ${tab === t.id ? 'border-accent-blue text-accent-blue' : 'border-transparent text-tx-muted hover:text-tx-secondary'}`}>
+          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-4 py-2.5 font-mono text-[9px] tracking-widest uppercase transition-all border-b-2 -mb-px whitespace-nowrap ${tab === t.id ? 'border-accent-blue text-accent-blue bg-accent-blue/5' : 'border-transparent text-tx-muted hover:text-tx-secondary hover:bg-bg-hover'}`}>
             <t.icon size={11} />
             {t.label}
           </button>
@@ -828,7 +904,7 @@ export default function AdminPage() {
               {filteredUsers.map((u) => {
                 const editing = !!userEdit[u.id]
                 const draft = userEdit[u.id] || {}
-                const canResetThisUser = canResetPasswords && ['federal_agent', 'visitante'].includes(u.rol) && u.id !== user?.id
+                const canResetThisUser = canResetPasswords && u.id !== user?.id && (isCS || ['federal_agent', 'visitante'].includes(u.rol))
                 return (
                   <tr key={u.id} className={`table-row ${!u.activo ? 'opacity-40' : ''}`}>
                     <td className="table-cell font-medium text-tx-primary">{u.username}</td>
@@ -859,20 +935,20 @@ export default function AdminPage() {
                       <button onClick={() => toggleFreeze(u.id, u.username, !!u.congelado)} className={`font-mono text-[8px] tracking-widest uppercase px-2 py-1 border ${u.congelado ? 'border-green-800 text-green-400' : 'border-cyan-800 text-cyan-400'}`} title={u.congelado ? `Motivo: ${u.congeladoReason || '—'}` : 'Solo lectura: puede ver todo pero no escribir'}>{u.congelado ? 'Descongelar' : 'Congelar'}</button>
                       {canResetThisUser && (
                         <button
-                          onClick={() => { setPwdResetTarget({ id: u.id, username: u.username, rol: u.rol }); setPwdResetValue('') }}
-                          className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400"
+                          onClick={() => openPwdResetModal({ id: u.id, username: u.username, rol: u.rol })}
+                          className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400 hover:bg-yellow-900/20 transition-colors"
                           title="Restablecer contraseña"
-                        >Reset pwd</button>
+                        >Reset PSW</button>
                       )}
-                      <button onClick={() => removeUser(u.id, u.username)} className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-red-800 text-red-400">Borrar</button>
+                       <button onClick={() => removeUser(u.id, u.username)} className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-red-800 text-red-400">Borrar</button>
                     </div></td>}
                     {!isCS && canResetPasswords && <td className="table-cell">
                       {canResetThisUser && (
                         <button
-                          onClick={() => { setPwdResetTarget({ id: u.id, username: u.username, rol: u.rol }); setPwdResetValue('') }}
-                          className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400"
+                          onClick={() => openPwdResetModal({ id: u.id, username: u.username, rol: u.rol })}
+                          className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400 hover:bg-yellow-900/20 transition-colors"
                           title="Restablecer contraseña"
-                        >Reset pwd</button>
+                        >Reset PSW</button>
                       )}
                     </td>}
                   </tr>

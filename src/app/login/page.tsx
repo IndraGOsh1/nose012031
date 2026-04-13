@@ -2,7 +2,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Lock, User, Key, AlertCircle, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Lock, User, Key, AlertCircle, ChevronRight, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { clearStoredSession, isSessionIdleExpired, login, markSessionActivity, register, setStoredUser } from '@/lib/client'
 
 type Mode = 'login' | 'register'
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const [form,    setForm]    = useState({ username:'', password:'', codigo:'', nombre:'' })
+  const [showPwd, setShowPwd] = useState(false)
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({...f,[k]:e.target.value}))
 
   useEffect(() => {
@@ -57,21 +58,28 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-bg-base flex items-center justify-center px-6 relative overflow-hidden">
+      {/* grid pattern */}
       <div className="absolute inset-0 opacity-15" style={{backgroundImage:"url(\"data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%231A2535' fill-opacity='1'%3E%3Cpath d='M0 0h1v40H0zm39 0h1v40h-1zM0 0v1h40V0zm0 39v1h40v-1z'/%3E%3C/g%3E%3C/svg%3E\")"}} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-accent-blue/5 blur-3xl pointer-events-none" />
+      {/* glow orb */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full bg-accent-blue/5 blur-3xl pointer-events-none" />
+      {/* top corner accent */}
+      <div className="absolute top-0 left-0 w-48 h-48 bg-accent-blue/3 blur-2xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-64 h-64 bg-accent-blue/3 blur-3xl pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-sm animate-fade-up">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-tx-muted hover:text-tx-secondary font-mono text-[9px] tracking-widest uppercase mb-7 transition-colors">
-          <ArrowLeft size={10} />Volver
+        <Link href="/" className="inline-flex items-center gap-1.5 text-tx-muted hover:text-tx-secondary font-mono text-[9px] tracking-widest uppercase mb-7 transition-colors group">
+          <ArrowLeft size={10} className="group-hover:-translate-x-0.5 transition-transform" />Volver
         </Link>
 
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden shadow-2xl">
           <div className="h-px bg-gradient-to-r from-transparent via-accent-blue to-transparent" />
 
           <div className="p-7 pb-5 flex flex-col items-center gap-3 border-b border-bg-border">
             <div className="relative">
-              <div className="absolute inset-0 bg-accent-blue/10 blur-xl rounded-full" />
-              <Image src="https://i.imgur.com/EAimMhx.png" alt="FIB" width={52} height={52} className="relative opacity-90" />
+              <div className="absolute inset-0 bg-accent-blue/15 blur-xl rounded-full" />
+              <div className="relative w-14 h-14 border border-accent-blue/20 bg-accent-blue/5 flex items-center justify-center">
+                <Image src="https://i.imgur.com/EAimMhx.png" alt="FIB" width={44} height={44} className="relative opacity-90" />
+              </div>
             </div>
             <div className="text-center">
               <p className="font-mono text-[9px] text-accent-blue tracking-[0.3em] uppercase mb-1">Federal Investigation Bureau</p>
@@ -84,7 +92,7 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-2 border-b border-bg-border">
             {(['login','register'] as Mode[]).map(m => (
-              <button key={m} onClick={() => { setMode(m); setError('') }}
+              <button key={m} onClick={() => { setMode(m); setError(''); setShowPwd(false) }}
                 className={`py-2.5 font-mono text-[9px] tracking-widest uppercase transition-all ${
                   mode===m ? 'bg-accent-blue/10 text-accent-blue border-b-2 border-accent-blue' : 'text-tx-muted hover:text-tx-secondary'
                 }`}>
@@ -99,7 +107,7 @@ export default function LoginPage() {
                 <label className="label">Nombre completo (IC)</label>
                 <div className="relative">
                   <User size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-tx-muted" />
-                  <input className="input pl-8" value={form.nombre} onChange={set('nombre')} placeholder="Juan García" />
+                  <input className="input pl-8" value={form.nombre} onChange={set('nombre')} placeholder="Juan García" autoComplete="name" />
                 </div>
               </div>
             )}
@@ -107,14 +115,31 @@ export default function LoginPage() {
               <label className="label">Usuario</label>
               <div className="relative">
                 <User size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-tx-muted" />
-                <input className="input pl-8" value={form.username} onChange={set('username')} placeholder="ID del agente" required autoComplete="off" />
+                <input className="input pl-8" value={form.username} onChange={set('username')} placeholder="ID del agente" required autoComplete="username" />
               </div>
             </div>
             <div>
               <label className="label">Contraseña</label>
               <div className="relative">
                 <Lock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-tx-muted" />
-                <input className="input pl-8" type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required />
+                <input
+                  className="input pl-8 pr-9"
+                  type={showPwd ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={set('password')}
+                  placeholder="••••••••"
+                  required
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPwd(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-tx-muted hover:text-tx-secondary transition-colors"
+                  aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPwd ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
               </div>
             </div>
             {mode === 'register' && (
@@ -122,14 +147,14 @@ export default function LoginPage() {
                 <label className="label">Código de Invitación</label>
                 <div className="relative">
                   <Key size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-tx-muted" />
-                  <input className="input pl-8" value={form.codigo} onChange={set('codigo')} placeholder="XXXXXXXX" required />
+                  <input className="input pl-8 uppercase tracking-widest" value={form.codigo} onChange={set('codigo')} placeholder="Código de invitación" required autoComplete="off" />
                 </div>
                 <p className="font-mono text-[8px] text-tx-muted mt-1.5">Emitido por Command Staff. Un solo uso.</p>
               </div>
             )}
 
             {error && (
-              <div className="flex items-center gap-2 p-2.5 bg-red-950/30 border border-red-900/50 text-red-400">
+              <div className="flex items-center gap-2 p-2.5 bg-red-950/30 border border-red-900/50 text-red-400 animate-fade-in">
                 <AlertCircle size={12} className="shrink-0" />
                 <span className="font-mono text-xs">{error}</span>
               </div>
