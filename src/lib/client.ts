@@ -133,6 +133,7 @@ export const borrarInvite = (codigo:string) => api<any>('/invite',{method:'DELET
 // Users
 export const getUsers   = (p?:Record<string,string>) => api<any>('/users'+(p?'?'+new URLSearchParams(p):''))
 export const editarUser = (id:string,b:any) => api<any>(`/users/${id}`,{method:'PATCH',body:JSON.stringify(b)})
+export const resetUserPassword = (id:string,newPassword:string) => api<any>(`/users/${id}`,{method:'PATCH',body:JSON.stringify({newPassword})})
 export const borrarUser = (id:string) => api<any>(`/users/${id}`,{method:'DELETE'})
 
 // Operativos
@@ -179,6 +180,7 @@ export const crearChatPrivado = (nombre:string, participantes:string[], descripc
 // Carpeta
 export const getCarpeta        = () => api<any>('/carpeta')
 export const getCarpetaByUsername = (username:string) => api<any>(`/carpeta?username=${encodeURIComponent(username)}`)
+export const getCarpetasAdmin  = () => api<any>('/carpeta?scope=admin')
 export const crearAnotacion    = (b:any) => api<any>('/carpeta',{method:'POST',body:JSON.stringify({tipo:'anotacion',...b})})
 export const borrarCarpetaItem = (tipo:string,id:string) => api<any>('/carpeta',{method:'DELETE',body:JSON.stringify({tipo,id})})
 export const crearHiloCarpeta  = (b:any, username?:string) => api<any>(`/carpeta${username ? `?username=${encodeURIComponent(username)}` : ''}`,{method:'POST',body:JSON.stringify({tipo:'hilo',...b})})
@@ -186,6 +188,12 @@ export const enviarMensajeHiloCarpeta = (hiloId:string, contenido:string, userna
 export const setEstadoHiloCarpeta = (hiloId:string, estado:'abierto'|'cerrado', username?:string) => api<any>(`/carpeta${username ? `?username=${encodeURIComponent(username)}` : ''}`,{method:'POST',body:JSON.stringify({tipo:'hilo_estado',hiloId,estado})})
 export const addAgentToCarpeta = (username:string, agent:string) => api<any>(`/carpeta/${encodeURIComponent(username)}/access?agent=${encodeURIComponent(agent)}`,{method:'POST'})
 export const removeAgentFromCarpeta = (username:string, agent:string) => api<any>(`/carpeta/${encodeURIComponent(username)}/access?agent=${encodeURIComponent(agent)}`,{method:'DELETE'})
+/** Asigna o remueve el supervisor de la carpeta de un agente (solo staff) */
+export const setCarpetaSupervisor = (ownerUsername:string, supervisor:string|null) => api<any>(`/carpeta?username=${encodeURIComponent(ownerUsername)}`,{method:'POST',body:JSON.stringify({tipo:'supervisor',supervisor})})
+/** Crea una carpeta nueva para un agente (solo staff) */
+export const crearCarpetaAdmin  = (agentUsername:string) => api<any>(`/folders/${encodeURIComponent(agentUsername)}/create`,{method:'POST'})
+/** Asigna la carpeta de un agente fuente al agente destino (solo staff) */
+export const asignarCarpetaAdmin = (agentUsername:string, folderId:string) => api<any>(`/folders/${encodeURIComponent(agentUsername)}/assign`,{method:'POST',body:JSON.stringify({folder_id:folderId})})
 
 // Config visual
 export const getConfigVisual   = async () => {

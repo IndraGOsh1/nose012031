@@ -7,6 +7,7 @@ import {
   Copy,
   RefreshCw,
   Key,
+  X as XIcon,
   Users,
   CheckCircle,
   Shield,
@@ -26,6 +27,7 @@ import {
   crearHiloCarpeta,
   editarUser,
   borrarUser,
+  resetUserPassword,
   getForms,
   saveForm,
   submitForm,
@@ -123,7 +125,10 @@ export default function AdminPage() {
   const [userEdit, setUserEdit] = useState<Record<string, any>>({})
   const [vetoReason, setVetoReason] = useState<Record<string, string>>({})
   const [freezeReason, setFreezeReason] = useState<Record<string, string>>({})
-
+  // Password reset state
+  const [pwdResetTarget, setPwdResetTarget] = useState<{ id: string; username: string; rol: string } | null>(null)
+  const [pwdResetValue, setPwdResetValue] = useState('')
+  const [pwdResetBusy, setPwdResetBusy] = useState(false)
   const [formsData, setFormsData] = useState<{ forms: any[]; canManage: boolean; config?: any }>({ forms: [], canManage: false })
   const [builder, setBuilder] = useState<any>(EMPTY_FORM)
   const [formsBusy, setFormsBusy] = useState(false)
@@ -145,7 +150,10 @@ export default function AdminPage() {
   const [carpetaPreview, setCarpetaPreview] = useState<any>(null)
 
   const isCS = user?.rol === 'command_staff'
+  const isSuperv = user?.rol === 'supervisory'
   const canManageForms = ['command_staff', 'supervisory'].includes(user?.rol)
+  /** Can reset passwords of federal_agent / visitante */
+  const canResetPasswords = isCS || isSuperv
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -399,6 +407,22 @@ export default function AdminPage() {
       setToast({ msg: 'Usuario eliminado', ok: true })
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
+    }
+  }
+
+  async function handlePwdReset(e: React.FormEvent) {
+    e.preventDefault()
+    if (!pwdResetTarget || !pwdResetValue.trim() || pwdResetBusy) return
+    setPwdResetBusy(true)
+    try {
+      await resetUserPassword(pwdResetTarget.id, pwdResetValue.trim())
+      setToast({ msg: `✅ Contraseña restablecida para @${pwdResetTarget.username}`, ok: true })
+      setPwdResetTarget(null)
+      setPwdResetValue('')
+    } catch (e: any) {
+      setToast({ msg: e.message || 'Error al restablecer contraseña', ok: false })
+    } finally {
+      setPwdResetBusy(false)
     }
   }
 
@@ -658,6 +682,64 @@ export default function AdminPage() {
     <div className="max-w-6xl mx-auto">
       {toast && <Toast msg={toast.msg} ok={toast.ok} onClose={() => setToast(null)} />}
 
+      {/* ── Password reset modal ──────────────────────────────────────────── */}
+      {pwdResetTarget && (
+        <div className="fixed inset-0 z-[200] bg-black/75 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setPwdResetTarget(null)}>
+          <div className="bg-bg-card border border-bg-border w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border">
+              <div>
+                <span className="section-tag">// Restablecer Contraseña</span>
+                <p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">
+                  Reset de acceso
+                </p>
+              </div>
+              <button onClick={() => setPwdResetTarget(null)} className="text-tx-muted hover:text-tx-primary">
+                <XIcon size={15} />
+              </button>
+            </div>
+            <form onSubmit={handlePwdReset} className="p-5 flex flex-col gap-4">
+              <div className="bg-bg-surface border border-bg-border px-3 py-2.5">
+                <p className="font-mono text-[9px] text-tx-muted uppercase tracking-widest mb-0.5">Usuario</p>
+                <p className="text-sm text-tx-primary font-medium">@{pwdResetTarget.username}</p>
+                <p className="font-mono text-[8px] text-tx-muted">{pwdResetTarget.rol.replace('_', ' ')}</p>
+              </div>
+              <div>
+                <label className="label">Nueva contraseña</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={pwdResetValue}
+                  onChange={e => setPwdResetValue(e.target.value)}
+                  placeholder="Mínimo 8 caracteres, letras y números"
+                  autoFocus
+                  required
+                  minLength={8}
+                />
+                <p className="font-mono text-[8px] text-tx-dim mt-1.5">
+                  El usuario deberá usar esta contraseña en su próximo inicio de sesión.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPwdResetTarget(null)}
+                  className="btn-ghost py-1.5 px-3 text-[9px]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={pwdResetBusy || pwdResetValue.trim().length < 8}
+                  className="btn-primary py-1.5 px-3 text-[9px] disabled:opacity-50"
+                >
+                  {pwdResetBusy ? 'Restableciendo...' : 'Restablecer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <span className="section-tag">// Administración</span>
         <h1 className="font-display text-xl font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Panel Admin Avanzado</h1>
@@ -741,11 +823,12 @@ export default function AdminPage() {
             </div>
           </div>
           <table className="w-full">
-            <thead><tr className="border-b border-bg-border">{(isCS ? ['Usuario', 'Nombre IC', 'Rol', 'Clases', 'Callsign', 'N° Agente', 'Discord', 'Estado', ''] : ['Usuario', 'Rol', 'Clases', 'Estado']).map((h) => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead><tr className="border-b border-bg-border">{(isCS ? ['Usuario', 'Nombre IC', 'Rol', 'Clases', 'Callsign', 'N° Agente', 'Discord', 'Estado', ''] : canResetPasswords ? ['Usuario', 'Rol', 'Clases', 'Estado', ''] : ['Usuario', 'Rol', 'Clases', 'Estado']).map((h) => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody>
               {filteredUsers.map((u) => {
                 const editing = !!userEdit[u.id]
                 const draft = userEdit[u.id] || {}
+                const canResetThisUser = canResetPasswords && ['federal_agent', 'visitante'].includes(u.rol) && u.id !== user?.id
                 return (
                   <tr key={u.id} className={`table-row ${!u.activo ? 'opacity-40' : ''}`}>
                     <td className="table-cell font-medium text-tx-primary">{u.username}</td>
@@ -774,8 +857,24 @@ export default function AdminPage() {
                       <button onClick={() => toggleVeto(u.id, u.username, !!u.vetado)} className={`font-mono text-[8px] tracking-widest uppercase px-2 py-1 border ${u.vetado ? 'border-green-800 text-green-400' : 'border-red-800 text-red-400'}`}>{u.vetado ? 'Quitar veto' : 'Vetar'}</button>
                       <input className="input text-xs py-1 px-2 w-36" placeholder="Motivo freeze" value={freezeReason[u.id] || ''} onChange={(e) => setFreezeReason((p) => ({ ...p, [u.id]: e.target.value }))} />
                       <button onClick={() => toggleFreeze(u.id, u.username, !!u.congelado)} className={`font-mono text-[8px] tracking-widest uppercase px-2 py-1 border ${u.congelado ? 'border-green-800 text-green-400' : 'border-cyan-800 text-cyan-400'}`} title={u.congelado ? `Motivo: ${u.congeladoReason || '—'}` : 'Solo lectura: puede ver todo pero no escribir'}>{u.congelado ? 'Descongelar' : 'Congelar'}</button>
+                      {canResetThisUser && (
+                        <button
+                          onClick={() => { setPwdResetTarget({ id: u.id, username: u.username, rol: u.rol }); setPwdResetValue('') }}
+                          className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400"
+                          title="Restablecer contraseña"
+                        >Reset pwd</button>
+                      )}
                       <button onClick={() => removeUser(u.id, u.username)} className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-red-800 text-red-400">Borrar</button>
                     </div></td>}
+                    {!isCS && canResetPasswords && <td className="table-cell">
+                      {canResetThisUser && (
+                        <button
+                          onClick={() => { setPwdResetTarget({ id: u.id, username: u.username, rol: u.rol }); setPwdResetValue('') }}
+                          className="font-mono text-[8px] tracking-widest uppercase px-2 py-1 border border-yellow-800 text-yellow-400"
+                          title="Restablecer contraseña"
+                        >Reset pwd</button>
+                      )}
+                    </td>}
                   </tr>
                 )
               })}

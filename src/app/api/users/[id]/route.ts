@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
 import { getUser, unauthorized, forbidden, notFound } from '@/lib/auth'
 import { deleteUserById, getDB, listUsersFresh, persistUser, type Rol } from '@/lib/db'
 import { cacheMapDelete, cacheMapSet } from '@/lib/supabase-map'
 import { logKeyAction, logRegistroImportante } from '@/lib/webhook'
+import { isStrongEnoughPassword } from '@/lib/security'
 
 const ROLES: Rol[] = ['command_staff', 'supervisory', 'federal_agent', 'visitante']
 const VALID_CLASSES = ['RRHH', 'CIRG', 'Task Force', 'UO', 'General']
@@ -15,8 +17,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const db = await getDB()
   const usr = db.users.get(id); if (!usr) return notFound('Usuario no encontrado')
   if (u.rol === 'supervisory' && usr.rol === 'command_staff') return forbidden()
-  const { rol, activo, discordId, agentNumber, nombre, callsign, vetado, vetoReason, congelado, congeladoReason, clases } = await req.json().catch(()=>({}))
+  const { rol, activo, discordId, agentNumber, nombre, callsign, vetado, vetoReason, congelado, congeladoReason, clases, newPassword } = await req.json().catch(()=>({}))
   const nextUser = { ...usr }
+
+  // ── Password reset (supervisory+ can only reset federal_agent / visitante) ─────
+  if (newPassword !== undefined) {
+    const targetRole: Rol = usr.rol
+    if (!['federal_agent', 'visitante'].includes(targetRole)) {
+      return NextResponse.json({ error: 'Solo se puede restablecer la contraseña de agentes federales y visitantes' }, { status: 403 })
+    }
+    if (usr.id === u.id) {
+      return NextResponse.json({ error: 'No puedes resetear tu propia contraseña desde aquí' }, { status: 400 })
+    }
+    const pwd = String(newPassword || '').trim()
+    if (!isStrongEnoughPassword(pwd)) {
+      return NextResponse.json({ error: 'La contraseña debe tener al menos 8 caracteres e incluir letras y números' }, { status: 400 })
+    }
+    nextUser.passwordHash = await bcrypt.hash(pwd, 12)
+    logKeyAction('Password Reset', u.username, `Contraseña restablecida para @${nextUser.username}`)
+    try {
+      await persistUser(nextUser)
+    } catch {
+      return NextResponse.json({ error: 'No se pudo persistir el cambio. Reintenta.' }, { status: 503 })
+    }
+    cacheMapSet(db.users, usr.id, nextUser)
+    const { passwordHash: _, ...safe } = nextUser
+    return NextResponse.json({ mensaje: '✅ Contraseña restablecida', usuario: safe })
+  }
 
   if (u.rol === 'command_staff') {
     if (rol !== undefined) {

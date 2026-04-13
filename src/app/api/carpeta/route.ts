@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, isUserFrozen, frozen } from '@/lib/auth'
-import { canAccessCarpetaHilo, canAccessCarpeta, getCarpeta, persistCarpeta, type HiloCarpeta } from '@/lib/carpeta-db'
+import { canAccessCarpetaHilo, canAccessCarpeta, getCarpeta, getCarpetasDB, persistCarpeta, type HiloCarpeta } from '@/lib/carpeta-db'
 import { getDB } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
@@ -15,49 +15,85 @@ export async function GET(req: NextRequest) {
   const targetDiscordId = searchParams.get('discordId')
   const isElevated = ['command_staff', 'supervisory'].includes(u.rol)
 
+  if (scope === 'admin') {
+    // Solo command_staff y supervisory pueden listar todas las carpetas
+    if (!isElevated) return forbidden()
+    try {
+      const db = await getDB()
+      const carpetasDB = await getCarpetasDB()
+
+      const items = Array.from(db.users.values())
+        .filter(user => user.username)
+        .map(user => {
+          const carpeta = carpetasDB.get(user.username)
+          return {
+            username: user.username,
+            nombre: user.nombre || user.username,
+            rol: user.rol,
+            agentNumber: user.agentNumber || null,
+            activo: user.activo !== false,
+            supervisor: carpeta?.supervisor || null,
+            tieneCarpeta: !!carpeta,
+            totalAnotaciones: carpeta?.anotaciones?.length || 0,
+            totalDocumentos: carpeta?.documentos?.length || 0,
+            totalHilos: carpeta?.hilos?.length || 0,
+            acceso: carpeta?.acceso || [],
+          }
+        })
+
+      return NextResponse.json({ carpetas: items })
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message || 'Error cargando carpetas' }, { status: 500 })
+    }
+  }
+
   if (scope === 'general') {
     if (!isElevated) return forbidden()
-    const db = await getDB()
-    const candidates = Array.from(db.users.values())
-      .filter((candidate) => candidate.username && candidate.activo !== false)
+    try {
+      const db = await getDB()
+      const candidates = Array.from(db.users.values())
+        .filter((candidate) => candidate.username && candidate.activo !== false)
 
-    const rows = await Promise.all(candidates.map(async (candidate) => {
-      const carpeta = await getCarpeta(candidate.username)
-      return { candidate, carpeta }
-    }))
-
-    const grouped = new Map<string, any[]>()
-
-    for (const row of rows) {
-      const section = (Array.isArray(row.candidate.clases) && row.candidate.clases[0]
-        ? String(row.candidate.clases[0]).trim()
-        : 'General') || 'General'
-      const hilos = (row.carpeta.hilos || []).map((hilo: any) => ({
-        ...hilo,
-        mensajes: Array.isArray(hilo.mensajes) ? hilo.mensajes.slice(-60) : [],
+      const rows = await Promise.all(candidates.map(async (candidate) => {
+        const carpeta = await getCarpeta(candidate.username)
+        return { candidate, carpeta }
       }))
-      if (!hilos.length) continue
 
-      if (!grouped.has(section)) grouped.set(section, [])
-      grouped.get(section)!.push(...hilos.map((hilo: any) => ({
-        ...hilo,
-        ownerUsername: row.candidate.username,
-        ownerNombre: row.candidate.nombre || row.candidate.username,
-        ownerCallsign: row.candidate.callsign || null,
-      })))
+      const grouped = new Map<string, any[]>()
+
+      for (const row of rows) {
+        const section = (Array.isArray(row.candidate.clases) && row.candidate.clases[0]
+          ? String(row.candidate.clases[0]).trim()
+          : 'General') || 'General'
+        const hilos = (row.carpeta.hilos || []).map((hilo: any) => ({
+          ...hilo,
+          mensajes: Array.isArray(hilo.mensajes) ? hilo.mensajes.slice(-60) : [],
+        }))
+        if (!hilos.length) continue
+
+        if (!grouped.has(section)) grouped.set(section, [])
+        grouped.get(section)!.push(...hilos.map((hilo: any) => ({
+          ...hilo,
+          ownerUsername: row.candidate.username,
+          ownerNombre: row.candidate.nombre || row.candidate.username,
+          ownerCallsign: row.candidate.callsign || null,
+        })))
+      }
+
+      const sections = Array.from(grouped.entries())
+        .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
+        .map(([section, hilos]) => ({
+          section,
+          hilos: hilos.sort((a: any, b: any) => String(b.creadoEn || '').localeCompare(String(a.creadoEn || ''))),
+        }))
+
+      return NextResponse.json({
+        sections,
+        totalThreads: sections.reduce((acc, section) => acc + section.hilos.length, 0),
+      })
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message || 'Error cargando vista general' }, { status: 500 })
     }
-
-    const sections = Array.from(grouped.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
-      .map(([section, hilos]) => ({
-        section,
-        hilos: hilos.sort((a: any, b: any) => String(b.creadoEn || '').localeCompare(String(a.creadoEn || ''))),
-      }))
-
-    return NextResponse.json({
-      sections,
-      totalThreads: sections.reduce((acc, section) => acc + section.hilos.length, 0),
-    })
   }
 
   if (!targetUsername && (targetAgentNumber || targetDiscordId)) {
@@ -103,6 +139,16 @@ export async function POST(req: NextRequest) {
   const canModerateExternal = targetUsername !== u.username && isElevated
   if (targetUsername !== u.username && !isElevated) return forbidden()
   const carpeta = await getCarpeta(targetUsername)
+
+  if (body.tipo === 'supervisor') {
+    // Solo staff elevado puede asignar o remover el supervisor de una carpeta
+    if (!isElevated) return forbidden()
+    const supervisorValue = body.supervisor ? String(body.supervisor).trim() : null
+    const next = { ...carpeta, supervisor: supervisorValue || null }
+    await persistCarpeta(next)
+    const msg = supervisorValue ? `✅ Supervisor "${supervisorValue}" asignado` : '✅ Supervisor removido'
+    return NextResponse.json({ mensaje: msg }, { status: 200 })
+  }
 
   if (body.tipo === 'anotacion') {
     const { titulo, contenido, privada } = body
