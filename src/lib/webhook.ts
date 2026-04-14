@@ -290,8 +290,8 @@ export function logAllanamientoHallazgo(numero: string, hallazgo: string, por: s
 export function logAllanamientoAutorizado(params: {
   numero: string
   autorizadoPor: string
-  callsignAutorizador?: string
-  numeroAgenteAutorizador?: string
+  callsignAutorizador?: string | null
+  numeroAgenteAutorizador?: string | null
   pngBuffer?: Buffer
   pdfBuffer?: Buffer
 }) {
