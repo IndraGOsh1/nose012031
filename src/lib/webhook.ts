@@ -234,3 +234,51 @@ export async function uploadImageToWebhook(imageBuffer: Buffer, filename: string
     return null
   }
 }
+
+// Allanamiento log helpers
+export function logAllanamiento(title: string, description: string, color?: number, fields?: EmbedField[]) {
+  return sendAllanamientoWebhook(title, description, color ?? COLORS.blue, fields)
+}
+
+export function logAllanamientoDocumentoGenerado(numero: string, por: string) {
+  return sendAllanamientoWebhook(
+    `📄 Documento Generado`,
+    `Allanamiento **${numero}** ha generado su documento PDF oficial.`,
+    COLORS.blue,
+    [{ name: 'Generado por', value: por, inline: true }]
+  )
+}
+
+export function logAllanamientoHallazgo(numero: string, hallazgo: string, por: string) {
+  return sendAllanamientoWebhook(
+    `🔍 Hallazgo Registrado`,
+    `En el allanamiento **${numero}** se registró un hallazgo.`,
+    COLORS.orange,
+    [
+      { name: 'Hallazgo', value: hallazgo, inline: false },
+      { name: 'Reportado por', value: por, inline: true },
+    ]
+  )
+}
+
+export function logAllanamientoAutorizado(numero: string, por: string) {
+  return sendAllanamientoWebhook(
+    `✅ Allanamiento Autorizado`,
+    `Allanamiento **${numero}** ha sido firmado y autorizado.`,
+    COLORS.green,
+    [{ name: 'Autorizado por', value: por, inline: true }]
+  )
+}
+
+export function logAllanamientoEjecutado(numero: string, direccion: string, por: string) {
+  return sendAllanamientoWebhook(
+    `⚠️ Allanamiento Ejecutado`,
+    `Allanamiento **${numero}** ha sido marcado como EJECUTADO.`,
+    COLORS.red,
+    [
+      { name: 'Dirección', value: direccion, inline: false },
+      { name: 'Ejecutado por', value: por, inline: true },
+    ]
+  )
+}
+
