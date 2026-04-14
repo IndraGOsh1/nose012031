@@ -3,7 +3,10 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, isUserFrozen, frozen } from '@/lib/auth'
 import { canAccessCarpetaHilo, canAccessCarpeta, getCarpeta, getCarpetasDB, persistCarpeta, type HiloCarpeta } from '@/lib/carpeta-db'
 import { getDB } from '@/lib/db'
+<<<<<<< HEAD
 import { recordAuditEvent } from '@/lib/audit-log'
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
 
 export async function GET(req: NextRequest) {
   const u = getUser(req)
@@ -115,6 +118,7 @@ export async function GET(req: NextRequest) {
     if (!canAccessCarpeta(carpeta, u.username, u.rol)) {
       return forbidden()
     }
+<<<<<<< HEAD
 
     // LOG ACCESS
     await recordAuditEvent({
@@ -125,6 +129,8 @@ export async function GET(req: NextRequest) {
       actor: u.nombre || u.username,
       meta: { target: targetUsername }
     })
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     
     return NextResponse.json({
       ...carpeta,
@@ -157,6 +163,7 @@ export async function POST(req: NextRequest) {
     const supervisorValue = body.supervisor ? String(body.supervisor).trim() : null
     const next = { ...carpeta, supervisor: supervisorValue || null }
     await persistCarpeta(next)
+<<<<<<< HEAD
     
     await recordAuditEvent({
       level: 'warn',
@@ -167,6 +174,8 @@ export async function POST(req: NextRequest) {
       meta: { target: targetUsername, supervisor: supervisorValue || 'null' }
     })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     const msg = supervisorValue ? `✅ Supervisor "${supervisorValue}" asignado` : '✅ Supervisor removido'
     return NextResponse.json({ mensaje: msg }, { status: 200 })
   }
@@ -179,6 +188,7 @@ export async function POST(req: NextRequest) {
       anotaciones: [...carpeta.anotaciones, { id:uuid().slice(0,8), titulo:titulo.trim(), contenido:contenido.trim(), fecha:now, privada:privada||false }],
     }
     await persistCarpeta(next)
+<<<<<<< HEAD
 
     await recordAuditEvent({
       level: 'info',
@@ -189,6 +199,8 @@ export async function POST(req: NextRequest) {
       meta: { target: targetUsername, titulo, privada: !!privada }
     })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     return NextResponse.json({ mensaje:'✅ Anotación guardada' }, { status:201 })
   }
 
@@ -200,6 +212,7 @@ export async function POST(req: NextRequest) {
       documentos: [...carpeta.documentos, { id:uuid().slice(0,8), nombre:nombre.trim(), descripcion:descripcion||'', fecha:now }],
     }
     await persistCarpeta(next)
+<<<<<<< HEAD
 
     await recordAuditEvent({
       level: 'info',
@@ -210,6 +223,8 @@ export async function POST(req: NextRequest) {
       meta: { target: targetUsername, nombre }
     })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     return NextResponse.json({ mensaje:'✅ Documento registrado' }, { status:201 })
   }
 
@@ -255,6 +270,7 @@ export async function POST(req: NextRequest) {
       ],
     }
     await persistCarpeta(next)
+<<<<<<< HEAD
 
     await recordAuditEvent({
       level: 'info',
@@ -265,6 +281,8 @@ export async function POST(req: NextRequest) {
       meta: { target: targetUsername, titulo, participantes: participantes.join(',') }
     })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     return NextResponse.json({ mensaje:'✅ Hilo privado creado' }, { status:201 })
   }
 
@@ -293,6 +311,7 @@ export async function POST(req: NextRequest) {
       }),
     }
     await persistCarpeta(next)
+<<<<<<< HEAD
 
     await recordAuditEvent({
       level: 'info',
@@ -303,6 +322,8 @@ export async function POST(req: NextRequest) {
       meta: { target: targetUsername, hilo: hilo.titulo }
     })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     return NextResponse.json({ mensaje:'✅ Mensaje enviado' }, { status:201 })
   }
 
@@ -332,6 +353,7 @@ export async function POST(req: NextRequest) {
       } as HiloCarpeta)),
     }
     await persistCarpeta(next)
+<<<<<<< HEAD
 
     await recordAuditEvent({
       level: 'warn',
@@ -342,6 +364,8 @@ export async function POST(req: NextRequest) {
       meta: { target: targetUsername, hilo: hilo.titulo, estado }
     })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
     return NextResponse.json({ mensaje:`✅ Hilo ${estado}` }, { status:201 })
   }
 
@@ -366,6 +390,7 @@ export async function DELETE(req: NextRequest) {
   }
   await persistCarpeta(next)
 
+<<<<<<< HEAD
   await recordAuditEvent({
     level: 'warn',
     source: 'personal',
@@ -375,5 +400,7 @@ export async function DELETE(req: NextRequest) {
     meta: { target: targetUsername, tipo, itemId: id }
   })
 
+=======
+>>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
   return NextResponse.json({ mensaje:'✅ Eliminado' })
 }

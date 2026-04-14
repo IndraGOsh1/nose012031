@@ -22,7 +22,7 @@ function getRolFromSeccion(seccion: string): any {
   const s = seccion.toLowerCase()
   if (s.includes('command staff')) return 'command_staff'
   if (s.includes('supervisory')) return 'supervisory'
-  if (s.includes('agentes federales') || s.includes('federal agent')) return 'federal_agent'
+  if (s.includes('agentes federales') || s.includes('federal agent') || s.includes('agent')) return 'federal_agent'
   return 'visitante'
 }
 

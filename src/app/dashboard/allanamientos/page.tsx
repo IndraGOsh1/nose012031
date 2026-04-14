@@ -21,17 +21,26 @@ function Toast({ msg, ok, onClose }: { msg:string;ok:boolean;onClose:()=>void })
 }
 
 function ModalCrear({ onClose, onSuccess }: { onClose:()=>void;onSuccess:(m:string)=>void }) {
-  const [form, setForm] = useState({ direccion:'', motivacion:'', descripcion:'', sospechoso:'', unidad:'General' })
+  const [form, setForm] = useState({ direccion:'', motivacion:'', descripcion:'', sospechoso:'', unidad:'General', albumFotos:[''] })
   const [loading, setLoading] = useState(false); const [error, setError] = useState('')
   const set = (k:keyof typeof form) => (e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>) => setForm(p=>({...p,[k]:e.target.value}))
+  
+  const addFotoField = () => setForm(p => ({ ...p, albumFotos: [...p.albumFotos, ''] }))
+  const removeFotoField = (idx: number) => setForm(p => ({ ...p, albumFotos: p.albumFotos.filter((_, i) => i !== idx) }))
+  const updateFotoField = (idx: number, val: string) => setForm(p => ({
+    ...p, 
+    albumFotos: p.albumFotos.map((v, i) => i === idx ? val : v)
+  }))
+
   async function submit(e:React.FormEvent) {
     e.preventDefault(); setError(''); setLoading(true)
-    try { await crearAllanamiento(form); onSuccess('Solicitud enviada'); onClose() }
+    const filteredFotos = form.albumFotos.filter(f => f.trim() !== '')
+    try { await crearAllanamiento({ ...form, albumFotos: filteredFotos }); onSuccess('Solicitud enviada'); onClose() }
     catch(err:any) { setError(err.message) } finally { setLoading(false) }
   }
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal w-full max-w-xl">
+      <div className="modal w-full max-w-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border">
           <div><span className="section-tag">// Nueva Solicitud</span><p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Solicitud de Allanamiento</p></div>
           <button onClick={onClose} className="text-tx-muted hover:text-tx-primary"><X size={15}/></button>
@@ -39,6 +48,29 @@ function ModalCrear({ onClose, onSuccess }: { onClose:()=>void;onSuccess:(m:stri
         <form onSubmit={submit} className="p-5 flex flex-col gap-3.5">
           <div><label className="label">Dirección / Ubicación *</label><input className="input" value={form.direccion} onChange={set('direccion')} placeholder="Calle 5 #23, Zona Industrial" required/></div>
           <div><label className="label">Sospechoso(s)</label><input className="input" value={form.sospechoso} onChange={set('sospechoso')} placeholder="Nombre o descripción"/></div>
+          
+          <div>
+            <label className="label flex justify-between items-center">
+              Álbum de Fotos / Evidencia Visual
+              <button type="button" onClick={addFotoField} className="text-[10px] text-accent-blue hover:underline">+ Añadir otra foto</button>
+            </label>
+            <div className="flex flex-col gap-2">
+              {form.albumFotos.map((url, i) => (
+                <div key={i} className="flex gap-2">
+                  <input 
+                    className="input text-xs py-1.5" 
+                    value={url} 
+                    onChange={e => updateFotoField(i, e.target.value)} 
+                    placeholder="URL de imagen (ej: imgur.com/...)"
+                  />
+                  {form.albumFotos.length > 1 && (
+                    <button type="button" onClick={() => removeFotoField(i)} className="text-red-500 hover:text-red-400 p-1"><Trash2 size={14}/></button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div><label className="label">Motivación / Justificación Legal *</label>
             <textarea className="input min-h-24 resize-none text-xs" value={form.motivacion} onChange={set('motivacion')} placeholder="Fundamento legal y evidencias que justifican el allanamiento..." required/>
           </div>
@@ -334,6 +366,18 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId:string;
               <p className="font-mono text-[8px] text-tx-muted uppercase mb-1">Motivación</p>
               <p className="text-xs text-tx-primary leading-relaxed whitespace-pre-wrap">{item.motivacion}</p>
             </div>
+            {item.albumFotos && item.albumFotos.length > 0 && (
+              <div className="bg-bg-surface border border-bg-border p-3">
+                <p className="font-mono text-[8px] text-tx-muted uppercase mb-2">Álbum de Evidencia ({item.albumFotos.length})</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {item.albumFotos.map((url: string, i: number) => (
+                    <a key={i} href={url} target="_blank" rel="noreferrer" className="block border border-bg-border hover:border-accent-blue transition-colors overflow-hidden rounded-sm">
+                      <img src={url} alt={`Evidencia ${i+1}`} className="w-full h-32 object-cover hover:scale-105 transition-transform" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             {item.descripcion && <div className="bg-bg-surface border border-bg-border p-3"><p className="font-mono text-[8px] text-tx-muted uppercase mb-1">Descripción</p><p className="text-xs text-tx-secondary">{item.descripcion}</p></div>}
             {item.motivoDenegacion && <div className="bg-red-900/10 border border-red-800/40 p-3"><p className="font-mono text-[8px] text-red-500 uppercase mb-1">Motivo de Denegación</p><p className="text-xs text-red-400">{item.motivoDenegacion}</p></div>}
             {item.firmas?.length>0 && (

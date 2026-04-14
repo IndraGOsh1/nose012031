@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const u = getUser(req); if (!u) return unauthorized()
   if (await isUserFrozen(u.id)) return frozen()
-  const { direccion, motivacion, descripcion, sospechoso, casoVinculado, unidad } = await req.json().catch(()=>({}))
+  const { direccion, motivacion, descripcion, sospechoso, casoVinculado, unidad, albumFotos } = await req.json().catch(()=>({}))
   if (!direccion?.trim() || !motivacion?.trim()) return err('direccion y motivacion son requeridos')
   const [allDB, userDB] = await Promise.all([getAllanamientosDB(), getDB()])
   const userProfile = Array.from(userDB.users.values()).find(us => us.username === u.username)
@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       fecha:now, tipo:'sistema'
     }],
     actualizadoEn:now,
+    albumFotos: Array.isArray(albumFotos) ? albumFotos : [],
   }
   try {
     await persistAllanamiento(all)
