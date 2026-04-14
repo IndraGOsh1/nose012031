@@ -287,12 +287,23 @@ export function logAllanamientoHallazgo(numero: string, hallazgo: string, por: s
   )
 }
 
-export function logAllanamientoAutorizado(numero: string, por: string) {
+export function logAllanamientoAutorizado(params: {
+  numero: string
+  autorizadoPor: string
+  callsignAutorizador?: string
+  numeroAgenteAutorizador?: string
+  pngBuffer?: Buffer
+  pdfBuffer?: Buffer
+}) {
   return sendAllanamientoWebhook(
     `✅ Allanamiento Autorizado`,
-    `Allanamiento **${numero}** ha sido firmado y autorizado.`,
+    `Allanamiento **${params.numero}** ha sido firmado y autorizado.`,
     COLORS.green,
-    [{ name: 'Autorizado por', value: por, inline: true }]
+    [
+      { name: 'Autorizado por', value: params.autorizadoPor, inline: true },
+      ...(params.callsignAutorizador ? [{ name: 'Callsign', value: params.callsignAutorizador, inline: true }] : []),
+      ...(params.numeroAgenteAutorizador ? [{ name: 'N° Agent', value: params.numeroAgenteAutorizador, inline: true }] : []),
+    ]
   )
 }
 
