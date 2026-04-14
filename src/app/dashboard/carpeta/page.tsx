@@ -77,6 +77,15 @@ export default function CarpetaPage() {
         loadStaffAgents()
       }
       addLog(`Sesión iniciada como ${parsed.nombre || parsed.username}`)
+
+      // Sincronización automática al entrar
+      const lastSync = localStorage.getItem('fib_last_auto_sync')
+      const now = Date.now()
+      if (!lastSync || now - Number(lastSync) > 10 * 60 * 1000) { // Cada 10 min
+        syncSheet().then(() => {
+          localStorage.setItem('fib_last_auto_sync', String(now))
+        })
+      }
     } else {
       setLoading(false)
     }

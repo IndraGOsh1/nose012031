@@ -1,0 +1,213 @@
+export type Rol = 'command_staff' | 'supervisory' | 'federal_agent' | 'visitante'
+
+export interface User {
+  id:           string
+  username:     string
+  passwordHash: string
+  rol:          Rol
+  discordId:    string | null
+  agentNumber:  string | null
+  nombre:       string | null
+  callsign:     string | null
+  createdAt:    string
+  activo:       boolean
+  vetado?:      boolean
+  vetoReason?:  string | null
+  vetoAt?:      string | null
+  vetoBy?:      string | null
+  clases?:      string[]
+  // Freeze: user can view everything but cannot perform any write/mutate action
+  congelado?:       boolean
+  congeladoReason?: string | null
+  congeladoAt?:     string | null
+  congeladoPor?:    string | null
+}
+
+export interface Invite {
+  codigo:      string
+  rol:         Rol
+  discordId:   string | null
+  agentNumber: string | null
+  nombre:      string | null
+  creadoPor:   string
+  creadoEn:    string
+  maxUsos:     number
+  usos:        number
+  usadoPor:    string[]
+}
+
+import { cacheMapDelete, cacheMapSet, SupabaseMap } from './supabase-map'
+import { createClient } from '@supabase/supabase-js'
+import { getSecret } from './secrets'
+
+const BOOTSTRAP_INVITE_CODE = 'FIB-CS-BOOTSTRAP'
+
+const INITIAL_INVITE: Invite = {
+  codigo: BOOTSTRAP_INVITE_CODE, rol:'command_staff',
+  discordId:null, agentNumber:null, nombre:null,
+  creadoPor:'SYSTEM', creadoEn:new Date().toISOString(),
+  maxUsos:2, usos:0, usadoPor:[],
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __fibDB: { users: Map<string,User>; invites: Map<string,Invite> } | undefined
+  var __fibDBInit: Promise<{ users: Map<string,User>; invites: Map<string,Invite> }> | undefined
+}
+
+const isSupabaseEnabled = !!(getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)
+
+let _adminClient: ReturnType<typeof createClient> | null = null
+// eslint-disable-next-line no-var
+declare global { var __fibDbKeyWarned: boolean | undefined }
+
+function getAdminClient() {
+  if (_adminClient) return _adminClient
+  const url = getSecret('SUPABASE_URL') || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const serviceKey = getSecret('SUPABASE_SERVICE_ROLE_KEY')
+  const publicFallback =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    ''
+  const key = serviceKey || publicFallback
+  if (!url || !key) return null
+  if (!serviceKey && publicFallback && process.env.NODE_ENV === 'production' && !global.__fibDbKeyWarned) {
+    console.warn(
+      '[db] ADVERTENCIA: usando clave pública (NEXT_PUBLIC_*) para operaciones de administración. ' +
+      'Configura SUPABASE_SERVICE_ROLE_KEY para mayor seguridad.',
+    )
+    global.__fibDbKeyWarned = true
+  }
+  _adminClient = createClient(url, key)
+  return _adminClient
+}
+
+async function initDB() {
+  if (isSupabaseEnabled) {
+    const [users, invites] = await Promise.all([
+      SupabaseMap.create<'id', User>('users', 'id'),
+      SupabaseMap.create<'codigo', Invite>('invites', 'codigo', [INITIAL_INVITE]),
+    ])
+    return { users, invites }
+  }
+  if (!global.__fibDB) {
+    global.__fibDB = { users: new Map(), invites: new Map() }
+    global.__fibDB.invites.set(BOOTSTRAP_INVITE_CODE, INITIAL_INVITE)
+  }
+  return global.__fibDB!
+}
+
+if (!global.__fibDBInit) {
+  global.__fibDBInit = initDB().then(db => {
+    global.__fibDB = db
+    return db
+  })
+}
+
+export async function getDB() {
+  return global.__fibDBInit!
+}
+
+export async function persistUserAndInvite(user: User, invite: Invite) {
+  if (!isSupabaseEnabled) return
+  const client = getAdminClient()
+  if (!client) return
+
+  const { error: userErr } = await (client.from('users') as any).upsert(user as any)
+  if (userErr) throw new Error(`[db] No se pudo persistir usuario: ${userErr.message}`)
+
+  const { error: inviteErr } = await (client.from('invites') as any).upsert(invite as any)
+  if (!inviteErr) return
+
+  await (client.from('users') as any).delete().eq('id', user.id)
+  throw new Error(`[db] No se pudo persistir invite: ${inviteErr.message}`)
+}
+
+export async function persistUser(user: User) {
+  if (!isSupabaseEnabled) return
+  const client = getAdminClient()
+  if (!client) return
+  const { error } = await (client.from('users') as any).upsert(user as any)
+  if (error) throw new Error(`[db] No se pudo persistir usuario: ${error.message}`)
+}
+
+export async function deleteUserById(id: string) {
+  if (!isSupabaseEnabled) return
+  const client = getAdminClient()
+  if (!client) return
+  const { error } = await (client.from('users') as any).delete().eq('id', id)
+  if (error) throw new Error(`[db] No se pudo eliminar usuario: ${error.message}`)
+}
+
+export async function persistInvite(invite: Invite) {
+  if (!isSupabaseEnabled) return
+  const client = getAdminClient()
+  if (!client) return
+  const { error } = await (client.from('invites') as any).upsert(invite as any)
+  if (error) throw new Error(`[db] No se pudo persistir invitacion: ${error.message}`)
+}
+
+export async function listUsersFresh(): Promise<User[]> {
+  const db = await getDB()
+  const fallback = Array.from(db.users.values())
+  if (!isSupabaseEnabled) return fallback
+
+  const client = getAdminClient()
+  if (!client) return fallback
+  const { data, error } = await (client.from('users') as any).select('*')
+  if (error || !Array.isArray(data)) return fallback
+
+  const rows = data as User[]
+  for (const row of rows) cacheMapSet(db.users, row.id, row)
+  return rows
+}
+
+export async function listInvitesFresh(): Promise<Invite[]> {
+  const db = await getDB()
+  const fallback = Array.from(db.invites.values())
+  if (!isSupabaseEnabled) return fallback
+
+  const client = getAdminClient()
+  if (!client) return fallback
+  const { data, error } = await (client.from('invites') as any).select('*')
+  if (error || !Array.isArray(data)) return fallback
+
+  const rows = data as Invite[]
+  for (const row of rows) cacheMapSet(db.invites, String(row.codigo || '').toUpperCase(), { ...row, codigo: String(row.codigo || '').toUpperCase() })
+  return rows.map((row) => ({ ...row, codigo: String(row.codigo || '').toUpperCase() }))
+}
+
+export async function findInviteByCode(codigo: string): Promise<Invite | null> {
+  const db = await getDB()
+  const code = String(codigo || '').trim().toUpperCase()
+  if (!code) return null
+
+  const local = db.invites.get(code)
+  if (local) return local
+
+  if (!isSupabaseEnabled) return null
+  const client = getAdminClient()
+  if (!client) return null
+
+  const { data, error } = await (client.from('invites') as any).select('*').eq('codigo', code).maybeSingle()
+  if (error || !data) return null
+
+  const invite = { ...(data as Invite), codigo: code }
+  cacheMapSet(db.invites, code, invite)
+  return invite
+}
+
+export async function deleteInviteByCode(codigo: string) {
+  if (!isSupabaseEnabled) return
+  const client = getAdminClient()
+  if (!client) return
+  const { error } = await (client.from('invites') as any).delete().eq('codigo', codigo)
+  if (error) throw new Error(`[db] No se pudo eliminar invitacion: ${error.message}`)
+}
+
+export const DB = new Proxy({} as { users: Map<string,User>; invites: Map<string,Invite> }, {
+  get(_t, prop) {
+    if (!global.__fibDB) throw new Error('[DB] Acceso antes de inicializar. Usa getDB() en rutas async.')
+    return (global.__fibDB as any)[prop]
+  }
+})

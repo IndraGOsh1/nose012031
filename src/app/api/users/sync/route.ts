@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser, unauthorized, forbidden } from '@/lib/auth'
-import { listUsersFresh, getDB, persistUser, type User } from '@/lib/db'
+import { listUsersFresh, getDB, persistUser } from '@/lib/db'
 import { getRows, COL, toAgent } from '@/lib/sheets'
-import { CONFIG } from '@/lib/config'
+import { CONFIG, seccionDeRango, ROLES_ORDEN } from '@/lib/config'
 import { cacheMapSet } from '@/lib/supabase-map'
 
 /**
@@ -14,9 +14,21 @@ function normalizeName(name: string | null): string {
   return name.replace(/_/g, ' ').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
+/**
+ * Mapea la sección del spreadsheet al rol de la base de datos.
+ */
+function getRolFromSeccion(seccion: string): any {
+  const s = seccion.toLowerCase()
+  if (s.includes('command staff')) return 'command_staff'
+  if (s.includes('supervisory')) return 'supervisory'
+  if (s.includes('agentes federales') || s.includes('federal agent')) return 'federal_agent'
+  return 'visitante'
+}
+
 export async function POST(req: NextRequest) {
   const u = getUser(req)
   if (!u) return unauthorized()
+  // Solo Command Staff o Supervisory pueden forzar la sincronización manual
   if (!['command_staff', 'supervisory'].includes(u.rol)) return forbidden()
 
   try {
@@ -34,18 +46,13 @@ export async function POST(req: NextRequest) {
 
     // 2. Mapear y actualizar cada usuario de la DB
     for (const user of dbUsers) {
-      // Intentar encontrar coincidencia en el spreadsheet
-      // Prioridad 1: Discord ID
-      // Prioridad 2: Nombre normalizado
-      let matchedAgent = agents.find(a => 
-        (a.discordId && user.discordId && a.discordId === user.discordId)
-      )
-
-      if (!matchedAgent) {
-        const userNormName = normalizeName(user.nombre)
-        if (userNormName) {
-          matchedAgent = agents.find(a => normalizeName(a.nombre) === userNormName)
-        }
+      // El nombre IC es ahora el identificador único y obligatorio para la sincronización.
+      // Ya no se utiliza la ID de Discord para vincular cuentas.
+      let matchedAgent = null
+      const userNormName = normalizeName(user.nombre)
+      
+      if (userNormName) {
+        matchedAgent = agents.find(a => normalizeName(a.nombre) === userNormName)
       }
 
       if (matchedAgent) {
@@ -66,6 +73,20 @@ export async function POST(req: NextRequest) {
           changed = true
         }
 
+        // Sincronización de ROL basada en la SECCIÓN del spreadsheet
+        const sheetRol = getRolFromSeccion(matchedAgent.seccion)
+        if (sheetRol && nextUser.rol !== sheetRol) {
+          nextUser.rol = sheetRol
+          changed = true
+        }
+
+        // Sincronización de ESTADO (Activo/Inactivo)
+        const isSheetActivo = matchedAgent.estado.toLowerCase().includes('activo')
+        if (nextUser.activo !== isSheetActivo) {
+          nextUser.activo = isSheetActivo
+          changed = true
+        }
+
         if (changed) {
           await persistUser(nextUser)
           cacheMapSet(db.users, user.id, nextUser)
@@ -74,7 +95,9 @@ export async function POST(req: NextRequest) {
             username: user.username,
             nombre: nextUser.nombre,
             callsign: nextUser.callsign,
-            agentNumber: nextUser.agentNumber
+            agentNumber: nextUser.agentNumber,
+            rol: nextUser.rol,
+            activo: nextUser.activo
           })
         }
       }
