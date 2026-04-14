@@ -15,6 +15,7 @@ const WEBHOOKS = {
   keys:      getSecret('DISCORD_WEBHOOK_KEYS'),
   logins:    getSecret('DISCORD_WEBHOOK_LOGINS'),
   important: getSecret('DISCORD_WEBHOOK_IMPORTANTE') || getSecret('DISCORD_WEBHOOK_IMPORTANT'),
+  audit:     getSecret('DISCORD_WEBHOOK_AUDIT') || getSecret('DISCORD_WEBHOOK_IMPORTANTE') || getSecret('DISCORD_WEBHOOK_IMPORTANT'),
 }
 
 const ALLANAMIENTO_WEBHOOK =
@@ -26,12 +27,13 @@ type Color = number
 const COLORS = {
   green:  0x2ECC71,
   red:    0xE74C3C,
-  blue:   0x3498DB,
+  blue:   0x1B6FFF, // FIB Blue
   yellow: 0xF1C40F,
   gray:   0x95A5A6,
   purple: 0x9B59B6,
   orange: 0xE67E22,
   cyan:   0x1ABC9C,
+  fib_red: 0xCC0000,
 }
 
 interface EmbedField { name: string; value: string; inline?: boolean }
@@ -43,6 +45,7 @@ interface WebhookPayload {
   fields?: EmbedField[]
   description?: string
   footer?: string
+  timestamp?: string
 }
 
 declare global {
@@ -56,13 +59,6 @@ export async function logWebhook(payload: WebhookPayload) {
   if (!url) {
     if (!global.__fibWebhookMissingWarned[payload.type]) {
       console.warn(`[webhook] Missing env for channel: ${payload.type}`)
-      void recordAuditEvent({
-        level: 'warn',
-        source: 'webhook',
-        event: 'missing_channel_env',
-        message: `Missing env for channel: ${payload.type}`,
-        meta: { channel: payload.type },
-      }).catch(() => {})
       global.__fibWebhookMissingWarned[payload.type] = true
     }
     return
@@ -73,44 +69,45 @@ export async function logWebhook(payload: WebhookPayload) {
     color:       payload.color ?? COLORS.blue,
     description: payload.description,
     fields:      payload.fields || [],
-    timestamp:   new Date().toISOString(),
+    timestamp:   payload.timestamp || new Date().toISOString(),
     footer:      { text: payload.footer || 'FIB HQ System' },
   }
 
   try {
-    const res = await fetch(url, {
+    await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ embeds: [embed] }),
     })
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      void recordAuditEvent({
-        level: 'error',
-        source: 'webhook',
-        event: 'discord_embed_failed',
-        message: `Discord webhook failed (${res.status})`,
-        meta: { channel: payload.type, title: payload.title, body: text.slice(0, 300) },
-      }).catch(() => {})
-      return
-    }
-
-    void recordAuditEvent({
-      level: 'info',
-      source: 'webhook',
-      event: 'discord_embed_sent',
-      message: payload.title,
-      meta: { channel: payload.type },
-    }).catch(() => {})
   } catch (error) {
-    void recordAuditEvent({
-      level: 'error',
-      source: 'webhook',
-      event: 'discord_embed_exception',
-      message: payload.title,
-      meta: { channel: payload.type, error: error instanceof Error ? error.message : String(error) },
-    }).catch(() => {})
+    console.error(`[webhook] Error sending to ${payload.type}:`, error)
   }
+}
+
+export const logAudit = (entry: any) => {
+  const levelColors: Record<string, number> = {
+    info: COLORS.blue,
+    warn: COLORS.orange,
+    error: COLORS.red,
+  }
+
+  const metaFields = Object.entries(entry.meta || {})
+    .slice(0, 10)
+    .map(([k, v]) => ({ name: k, value: String(v).slice(0, 1024), inline: true }))
+
+  return logWebhook({
+    type: 'audit',
+    title: `📡 Audit: ${entry.event}`,
+    color: levelColors[entry.level] || COLORS.gray,
+    description: entry.message,
+    timestamp: entry.timestamp,
+    fields: [
+      { name: 'Origen', value: entry.source, inline: true },
+      { name: 'Actor', value: entry.actor || '—', inline: true },
+      { name: 'Nivel', value: entry.level.toUpperCase(), inline: true },
+      ...metaFields,
+    ],
+  })
 }
 
 // Helpers

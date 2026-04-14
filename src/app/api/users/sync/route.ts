@@ -4,6 +4,7 @@ import { listUsersFresh, getDB, persistUser } from '@/lib/db'
 import { getRows, COL, toAgent } from '@/lib/sheets'
 import { CONFIG, seccionDeRango, ROLES_ORDEN } from '@/lib/config'
 import { cacheMapSet } from '@/lib/supabase-map'
+import { recordAuditEvent } from '@/lib/audit-log'
 
 /**
  * Normaliza un nombre IC para comparación.
@@ -91,16 +92,34 @@ export async function POST(req: NextRequest) {
           await persistUser(nextUser)
           cacheMapSet(db.users, user.id, nextUser)
           updatedCount++
+          
+          const changeLog = []
+          if (matchedAgent.nombre && user.nombre !== matchedAgent.nombre) changeLog.push(`Nombre: ${user.nombre} -> ${matchedAgent.nombre}`)
+          if (matchedAgent.apodo && user.callsign !== matchedAgent.apodo) changeLog.push(`Callsign: ${user.callsign} -> ${matchedAgent.apodo}`)
+          if (matchedAgent.numero && user.agentNumber !== String(matchedAgent.numero)) changeLog.push(`Placa: ${user.agentNumber} -> ${matchedAgent.numero}`)
+          if (sheetRol && user.rol !== sheetRol) changeLog.push(`Rol: ${user.rol} -> ${sheetRol}`)
+
           results.push({
             username: user.username,
             nombre: nextUser.nombre,
-            callsign: nextUser.callsign,
-            agentNumber: nextUser.agentNumber,
-            rol: nextUser.rol,
-            activo: nextUser.activo
+            changes: changeLog
           })
         }
       }
+    }
+
+    if (updatedCount > 0) {
+      await recordAuditEvent({
+        level: 'info',
+        source: 'personal',
+        event: 'spreadsheet_sync',
+        message: `Sincronización masiva completada: ${updatedCount} usuarios actualizados.`,
+        actor: u.nombre || u.username,
+        meta: { 
+          updatedCount, 
+          details: results.map(r => `${r.nombre} (@${r.username}): ${r.changes.join(', ')}`).join('\n').slice(0, 2000)
+        }
+      })
     }
 
     return NextResponse.json({
@@ -111,6 +130,14 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[sync] Error:', error)
+    await recordAuditEvent({
+      level: 'error',
+      source: 'personal',
+      event: 'spreadsheet_sync_error',
+      message: `Error en sincronización: ${error.message}`,
+      actor: u.nombre || u.username,
+      meta: { error: error.message }
+    })
     return NextResponse.json({ error: 'Error durante la sincronización: ' + error.message }, { status: 500 })
   }
 }

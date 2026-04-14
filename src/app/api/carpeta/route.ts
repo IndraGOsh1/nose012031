@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, isUserFrozen, frozen } from '@/lib/auth'
 import { canAccessCarpetaHilo, canAccessCarpeta, getCarpeta, getCarpetasDB, persistCarpeta, type HiloCarpeta } from '@/lib/carpeta-db'
 import { getDB } from '@/lib/db'
+import { recordAuditEvent } from '@/lib/audit-log'
 
 export async function GET(req: NextRequest) {
   const u = getUser(req)
@@ -114,6 +115,16 @@ export async function GET(req: NextRequest) {
     if (!canAccessCarpeta(carpeta, u.username, u.rol)) {
       return forbidden()
     }
+
+    // LOG ACCESS
+    await recordAuditEvent({
+      level: 'info',
+      source: 'personal',
+      event: 'carpeta_access',
+      message: `Acceso a carpeta de ${targetUsername}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername }
+    })
     
     return NextResponse.json({
       ...carpeta,
@@ -146,6 +157,16 @@ export async function POST(req: NextRequest) {
     const supervisorValue = body.supervisor ? String(body.supervisor).trim() : null
     const next = { ...carpeta, supervisor: supervisorValue || null }
     await persistCarpeta(next)
+    
+    await recordAuditEvent({
+      level: 'warn',
+      source: 'personal',
+      event: 'carpeta_supervisor_change',
+      message: `Supervisor de ${targetUsername} cambiado a ${supervisorValue || 'Ninguno'}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername, supervisor: supervisorValue || 'null' }
+    })
+
     const msg = supervisorValue ? `✅ Supervisor "${supervisorValue}" asignado` : '✅ Supervisor removido'
     return NextResponse.json({ mensaje: msg }, { status: 200 })
   }
@@ -158,6 +179,16 @@ export async function POST(req: NextRequest) {
       anotaciones: [...carpeta.anotaciones, { id:uuid().slice(0,8), titulo:titulo.trim(), contenido:contenido.trim(), fecha:now, privada:privada||false }],
     }
     await persistCarpeta(next)
+
+    await recordAuditEvent({
+      level: 'info',
+      source: 'personal',
+      event: 'carpeta_anotacion_add',
+      message: `Nueva anotación en carpeta de ${targetUsername}: ${titulo}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername, titulo, privada: !!privada }
+    })
+
     return NextResponse.json({ mensaje:'✅ Anotación guardada' }, { status:201 })
   }
 
@@ -169,6 +200,16 @@ export async function POST(req: NextRequest) {
       documentos: [...carpeta.documentos, { id:uuid().slice(0,8), nombre:nombre.trim(), descripcion:descripcion||'', fecha:now }],
     }
     await persistCarpeta(next)
+
+    await recordAuditEvent({
+      level: 'info',
+      source: 'personal',
+      event: 'carpeta_documento_add',
+      message: `Nuevo documento en carpeta de ${targetUsername}: ${nombre}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername, nombre }
+    })
+
     return NextResponse.json({ mensaje:'✅ Documento registrado' }, { status:201 })
   }
 
@@ -214,6 +255,16 @@ export async function POST(req: NextRequest) {
       ],
     }
     await persistCarpeta(next)
+
+    await recordAuditEvent({
+      level: 'info',
+      source: 'personal',
+      event: 'carpeta_hilo_create',
+      message: `Nuevo hilo privado en carpeta de ${targetUsername}: ${titulo}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername, titulo, participantes: participantes.join(',') }
+    })
+
     return NextResponse.json({ mensaje:'✅ Hilo privado creado' }, { status:201 })
   }
 
@@ -242,6 +293,16 @@ export async function POST(req: NextRequest) {
       }),
     }
     await persistCarpeta(next)
+
+    await recordAuditEvent({
+      level: 'info',
+      source: 'personal',
+      event: 'carpeta_hilo_msg',
+      message: `Nuevo mensaje en hilo "${hilo.titulo}" de ${targetUsername}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername, hilo: hilo.titulo }
+    })
+
     return NextResponse.json({ mensaje:'✅ Mensaje enviado' }, { status:201 })
   }
 
@@ -271,6 +332,16 @@ export async function POST(req: NextRequest) {
       } as HiloCarpeta)),
     }
     await persistCarpeta(next)
+
+    await recordAuditEvent({
+      level: 'warn',
+      source: 'personal',
+      event: 'carpeta_hilo_state',
+      message: `Hilo "${hilo.titulo}" de ${targetUsername} marcado como ${estado}`,
+      actor: u.nombre || u.username,
+      meta: { target: targetUsername, hilo: hilo.titulo, estado }
+    })
+
     return NextResponse.json({ mensaje:`✅ Hilo ${estado}` }, { status:201 })
   }
 
@@ -294,6 +365,15 @@ export async function DELETE(req: NextRequest) {
     hilos: tipo === 'hilo' ? (carpeta.hilos || []).filter((hilo: any) => hilo.id !== id) : (carpeta.hilos || []),
   }
   await persistCarpeta(next)
+
+  await recordAuditEvent({
+    level: 'warn',
+    source: 'personal',
+    event: 'carpeta_item_delete',
+    message: `Elemento eliminado (${tipo}) en carpeta de ${targetUsername}`,
+    actor: u.nombre || u.username,
+    meta: { target: targetUsername, tipo, itemId: id }
+  })
 
   return NextResponse.json({ mensaje:'✅ Eliminado' })
 }

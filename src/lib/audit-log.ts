@@ -1,5 +1,6 @@
 import { SupabaseMap, persistentMapSet } from './supabase-map'
 import { getSecret } from './secrets'
+import { logAudit } from './webhook'
 
 export type AuditLevel = 'info' | 'warn' | 'error'
 
@@ -86,6 +87,13 @@ export async function recordAuditEvent(input: {
   }
 
   await persistentMapSet(db, entry.id, entry)
+
+  // Auto-send to Discord if level is warn/error OR it's a critical event
+  const isCritical = ['auth','config','personal'].includes(entry.source) || entry.level !== 'info'
+  if (isCritical) {
+    void logAudit(entry).catch(() => {})
+  }
+
   return entry
 }
 
