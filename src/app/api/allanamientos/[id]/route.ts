@@ -203,7 +203,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
       tipo: 'accion',
     })
 
-    afterPersist.push(() => logAllanamiento('Autorizacion retirada', next.numeroSolicitud, u.username))
+    afterPersist.push(() => logAllanamiento('↩️ Autorización Retirada', `Solicitud ${next.numeroSolicitud} - Retirada por ${u.username}`))
   }
 
   if (accion === 'denegar' && isSuperv) {
@@ -213,7 +213,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
     next.motivoDenegacion = motivo
     next.mensajes.push({ id:uuid().slice(0,8), autor:'SYSTEM', nombre:'Sistema',
       contenido:`❌ Denegado por ${u.nombre||u.username}: ${next.motivoDenegacion}`, fecha:now, tipo:'accion' })
-    afterPersist.push(() => logAllanamiento('Denegado', next.numeroSolicitud ?? undefined, u.username, next.motivoDenegacion ?? undefined))
+    afterPersist.push(() => logAllanamiento('❌ Allanamiento Denegado', `Solicitud ${next.numeroSolicitud} - Motivo: ${next.motivoDenegacion}`))
   }
 
   if (accion === 'ejecutar' && isSuperv) {

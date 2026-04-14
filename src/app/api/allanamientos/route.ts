@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return err('No se pudo persistir la solicitud de allanamiento. Reintenta.', 503)
   }
-  logAllanamiento('Creada', all.numeroSolicitud, u.username, direccion)
+  logAllanamientoCreado(all.numeroSolicitud, direccion, u.username)
 
   ;(async () => {
     let pngBuffer: Buffer | undefined

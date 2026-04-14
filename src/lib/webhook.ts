@@ -266,23 +266,40 @@ export function logAllanamientoCreado(numero: string, direccion: string, solicit
   )
 }
 
-export function logAllanamientoDocumentoGenerado(numero: string, por: string) {
+export function logAllanamientoDocumentoGenerado(params: {
+  numero: string
+  direccion?: string
+  generadoPor: string
+  previewUrl?: string
+}) {
   return sendAllanamientoWebhook(
     `📄 Documento Generado`,
-    `Allanamiento **${numero}** ha generado su documento PDF oficial.`,
+    `Allanamiento **${params.numero}** ha generado su documento PDF oficial.`,
     COLORS.blue,
-    [{ name: 'Generado por', value: por, inline: true }]
+    [
+      { name: 'Generado por', value: params.generadoPor, inline: true },
+      ...(params.direccion ? [{ name: 'Dirección', value: params.direccion, inline: true }] : []),
+      ...(params.previewUrl ? [{ name: 'Preview', value: params.previewUrl, inline: false }] : []),
+    ]
   )
 }
 
-export function logAllanamientoHallazgo(numero: string, hallazgo: string, por: string) {
+export function logAllanamientoHallazgo(params: {
+  numero: string
+  hallazgo: string
+  reportadoPor: string
+  propiedad?: string
+  evidenciaUrl?: string
+}) {
   return sendAllanamientoWebhook(
     `🔍 Hallazgo Registrado`,
-    `En el allanamiento **${numero}** se registró un hallazgo.`,
+    `En el allanamiento **${params.numero}** se registró un hallazgo.`,
     COLORS.orange,
     [
-      { name: 'Hallazgo', value: hallazgo, inline: false },
-      { name: 'Reportado por', value: por, inline: true },
+      { name: 'Hallazgo', value: params.hallazgo, inline: false },
+      { name: 'Reportado por', value: params.reportadoPor, inline: true },
+      ...(params.propiedad ? [{ name: 'Propiedad', value: params.propiedad, inline: true }] : []),
+      ...(params.evidenciaUrl ? [{ name: 'Evidencia', value: params.evidenciaUrl, inline: false }] : []),
     ]
   )
 }
@@ -307,14 +324,23 @@ export function logAllanamientoAutorizado(params: {
   )
 }
 
-export function logAllanamientoEjecutado(numero: string, direccion: string, por: string) {
+export function logAllanamientoEjecutado(params: {
+  numero: string
+  ejecutadoPor: string
+  direccion?: string
+  callsignEjecutor?: string | null
+  numeroAgenteEjecutor?: string | null
+  pngBuffer?: Buffer
+}) {
   return sendAllanamientoWebhook(
     `⚠️ Allanamiento Ejecutado`,
-    `Allanamiento **${numero}** ha sido marcado como EJECUTADO.`,
+    `Allanamiento **${params.numero}** ha sido marcado como EJECUTADO.`,
     COLORS.red,
     [
-      { name: 'Dirección', value: direccion, inline: false },
-      { name: 'Ejecutado por', value: por, inline: true },
+      { name: 'Ejecutado por', value: params.ejecutadoPor, inline: true },
+      ...(params.callsignEjecutor ? [{ name: 'Callsign', value: params.callsignEjecutor, inline: true }] : []),
+      ...(params.numeroAgenteEjecutor ? [{ name: 'N° Agent', value: params.numeroAgenteEjecutor, inline: true }] : []),
+      ...(params.direccion ? [{ name: 'Dirección', value: params.direccion, inline: false }] : []),
     ]
   )
 }
