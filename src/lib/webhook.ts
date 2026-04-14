@@ -240,6 +240,19 @@ export function logAllanamiento(title: string, description: string, color?: numb
   return sendAllanamientoWebhook(title, description, color ?? COLORS.blue, fields)
 }
 
+export function logAllanamientoCreado(numero: string, direccion: string, solicitante: string) {
+  return sendAllanamientoWebhook(
+    `📥 Nueva Solicitud de Allanamiento`,
+    `Se ha creado una nueva solicitud de allanamiento.`,
+    COLORS.orange,
+    [
+      { name: 'Número', value: numero, inline: true },
+      { name: 'Dirección', value: direccion, inline: true },
+      { name: 'Solicitante', value: solicitante, inline: true },
+    ]
+  )
+}
+
 export function logAllanamientoDocumentoGenerado(numero: string, por: string) {
   return sendAllanamientoWebhook(
     `📄 Documento Generado`,
