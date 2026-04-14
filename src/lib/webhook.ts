@@ -187,6 +187,19 @@ export const logRegistroImportante = (accion: 'Ascenso' | 'Descenso' | 'Sanción
     ],
   })
 
+export function logInviteCodes(codes: string[], por: string, rol: string) {
+  return logWebhook({
+    type: 'keys',
+    title: '🎫 Códigos de Invitación Generados',
+    color: COLORS.purple,
+    fields: [
+      { name: 'Generados por', value: por, inline: true },
+      { name: 'Rol asignado', value: rol, inline: true },
+      { name: 'Códigos', value: codes.join(', '), inline: false },
+    ],
+  })
+}
+
 export async function sendAllanamientoWebhook(title: string, description: string, color: Color, fields?: EmbedField[]) {
   if (!ALLANAMIENTO_WEBHOOK) return
   try {

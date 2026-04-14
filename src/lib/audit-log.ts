@@ -145,3 +145,31 @@ function buildDiscordPayload(entry: AuditLogEntry, resentBy: string) {
 
   return { content }
 }
+
+export async function resendAuditEventsToDiscord(eventIds: string[], resentBy: string): Promise<{ success: boolean; resent: number; failed: number }> {
+  const url = getAuditWebhookUrl()
+  if (!url) return { success: false, resent: 0, failed: eventIds.length }
+
+  const db = await getAuditLogsDB()
+  let resent = 0
+  let failed = 0
+
+  for (const id of eventIds) {
+    const entry = db.get(id)
+    if (!entry) { failed++; continue }
+
+    const payload = buildDiscordPayload(entry, resentBy)
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: payload.content }),
+      })
+      resent++
+    } catch {
+      failed++
+    }
+  }
+
+  return { success: failed === 0, resent, failed }
+}
