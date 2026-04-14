@@ -1,9 +1,6 @@
 import { SupabaseMap, persistentMapSet } from './supabase-map'
 import { getSecret } from './secrets'
-<<<<<<< HEAD
 import { logAudit } from './webhook'
-=======
->>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
 
 export type AuditLevel = 'info' | 'warn' | 'error'
 
@@ -90,16 +87,12 @@ export async function recordAuditEvent(input: {
   }
 
   await persistentMapSet(db, entry.id, entry)
-<<<<<<< HEAD
 
-  // Auto-send to Discord if level is warn/error OR it's a critical event
   const isCritical = ['auth','config','personal'].includes(entry.source) || entry.level !== 'info'
   if (isCritical) {
     void logAudit(entry).catch(() => {})
   }
 
-=======
->>>>>>> 0b7dbbb7becb6da8c167ff2bbb4ed7f1d2b0b74f
   return entry
 }
 
@@ -150,37 +143,5 @@ function buildDiscordPayload(entry: AuditLogEntry, resentBy: string) {
     metaLines.length ? 'Meta:\n' + metaLines.join('\n') : 'Meta: —',
   ].join('\n')
 
-  return { content: content.slice(0, 1900) }
-}
-
-export async function resendAuditEventsToDiscord(ids: string[], resentBy: string) {
-  const webhookUrl = getAuditWebhookUrl()
-  if (!webhookUrl) {
-    throw new Error('No existe webhook de auditoria configurado (DISCORD_WEBHOOK_AUDIT/IMPORTANTE/EXTRAS).')
-  }
-
-  const db = await getAuditLogsDB()
-  const uniqueIds = Array.from(new Set(ids.map((x) => String(x).trim()).filter(Boolean)))
-  const rows = uniqueIds.map((id) => db.get(id)).filter(Boolean) as AuditLogEntry[]
-  let sent = 0
-
-  for (const row of rows) {
-    const payload = buildDiscordPayload(row, resentBy)
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '')
-      throw new Error(`Discord webhook failed (${res.status}): ${txt.slice(0, 300)}`)
-    }
-
-    row.resentCount = (row.resentCount || 0) + 1
-    row.lastResentAt = new Date().toISOString()
-    await persistentMapSet(db, row.id, row)
-    sent += 1
-  }
-
-  return { requested: uniqueIds.length, found: rows.length, sent }
+  return { content }
 }
