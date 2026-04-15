@@ -39,6 +39,7 @@ export interface Allanamiento {
   observaciones:    string
   mensajes:         MensajeAllanamiento[]
   actualizadoEn:    string
+  albumFotos?:      string[]
 }
 
 import { SupabaseMap, persistentMapDelete, persistentMapSet } from './supabase-map'
@@ -88,13 +89,18 @@ export const AllanamientosDB = new Proxy({} as Map<string, Allanamiento>, {
   }
 })
 
-export async function nextAllNumber(solicitanteCallsign: string) {
+export async function nextAllNumber(solicitanteCallsign: string): Promise<string> {
   try {
     const db = await getAllanamientosDB()
-    const allCases = Array.from(db.values())
-    const totalCount = allCases.length + 1
+    const all = Array.from(db.values())
+    const maxN = all
+      .map(a => {
+        const m = a.numeroSolicitud?.match(/Numero de solicitud: (\d+)/)
+        return m ? parseInt(m[1], 10) : 0
+      })
+      .reduce((a, b) => Math.max(a, b), 0)
     const callsign = String(solicitanteCallsign || 'UNKNOWN').trim().slice(0, 20).toUpperCase()
-    return `${callsign}-PENDING // Numero de solicitud: ${String(totalCount).padStart(2, '0')}`
+    return `${callsign}-PENDING // Numero de solicitud: ${String(maxN + 1).padStart(2, '0')}`
   } catch {
     return `${String(solicitanteCallsign || 'UNKNOWN').trim().slice(0, 20).toUpperCase()}-PENDING // Numero de solicitud: 01`
   }

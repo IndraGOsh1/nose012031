@@ -53,6 +53,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const agentes = body.agentesAsignados.map((x: any) => String(x).trim()).filter(Boolean)
     if (agentes.length > 50) return err('Demasiados agentes asignados')
     next.agentesAsignados = agentes
+    // Sincronizar agentesAcceso: agregar nuevos agentes asignados, mantener los que ya tenían acceso explícito
+    const accesoActual = new Set(next.agentesAcceso || [])
+    agentes.forEach((a: string) => accesoActual.add(a))
+    next.agentesAcceso = Array.from(accesoActual)
   }
   if (body.addSospechoso) {
     const nombre = String(body.addSospechoso?.nombre || '').trim()

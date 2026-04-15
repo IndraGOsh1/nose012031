@@ -121,10 +121,18 @@ export const CasosDB = new Proxy({} as Map<string, Caso>, {
   }
 })
 
-let casoCounter = 2
-export function nextCaseNumber() {
-  const n = String(casoCounter++).padStart(3,'0')
-  return `FIB-${new Date().getFullYear()}-${n}`
+export async function nextCaseNumber(): Promise<string> {
+  const db = await getCasosDB()
+  const casos = Array.from(db.values())
+  const year = new Date().getFullYear()
+  const maxN = casos
+    .map(c => {
+      const m = c.numeroCaso?.match(/FIB-\d{4}-(\d+)/)
+      return m ? parseInt(m[1], 10) : 0
+    })
+    .reduce((a, b) => Math.max(a, b), 0)
+  const n = String(maxN + 1).padStart(3, '0')
+  return `FIB-${year}-${n}`
 }
 
 /**

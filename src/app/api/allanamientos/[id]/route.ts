@@ -203,7 +203,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
       tipo: 'accion',
     })
 
-    afterPersist.push(() => logAllanamiento('Autorizacion retirada', next.numeroSolicitud, u.username))
+    afterPersist.push(() => logAllanamiento('↩️ Autorización Retirada', `Solicitud ${next.numeroSolicitud} - Retirada por ${u.username}`))
   }
 
   if (accion === 'denegar' && isSuperv) {
@@ -213,7 +213,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
     next.motivoDenegacion = motivo
     next.mensajes.push({ id:uuid().slice(0,8), autor:'SYSTEM', nombre:'Sistema',
       contenido:`❌ Denegado por ${u.nombre||u.username}: ${next.motivoDenegacion}`, fecha:now, tipo:'accion' })
-    afterPersist.push(() => logAllanamiento('Denegado', next.numeroSolicitud ?? undefined, u.username, next.motivoDenegacion ?? undefined))
+    afterPersist.push(() => logAllanamiento('❌ Allanamiento Denegado', `Solicitud ${next.numeroSolicitud} - Motivo: ${next.motivoDenegacion}`))
   }
 
   if (accion === 'ejecutar' && isSuperv) {
@@ -362,6 +362,23 @@ export async function PATCH(req: NextRequest, { params }:P) {
 
   if (accion && !['autorizar', 'quitar_autorizacion', 'denegar', 'ejecutar', 'firmar', 'generar_pdf', 'reporte_hallazgo', 'editar'].includes(accion)) {
     return err('Accion invalida')
+  }
+
+  if (body.addFoto !== undefined) {
+    const canAddFoto = isSuperv || next.solicitadoPor === u.username
+    if (!canAddFoto) return forbidden()
+    const url = String(body.addFoto || '').trim()
+    if (!url || !/^https?:\/\//i.test(url)) return err('URL de foto inválida')
+    if (!Array.isArray(next.albumFotos)) next.albumFotos = []
+    if (next.albumFotos.length >= 20) return err('Máximo 20 fotos por allanamiento')
+    next.albumFotos.push(url)
+  }
+
+  if (body.removeFoto !== undefined) {
+    const canRemove = isSuperv || isIndra
+    if (!canRemove) return forbidden()
+    const url = String(body.removeFoto || '').trim()
+    next.albumFotos = (next.albumFotos || []).filter(f => f !== url)
   }
 
   next.actualizadoEn = now

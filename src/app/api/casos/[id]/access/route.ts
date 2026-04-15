@@ -31,11 +31,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     await addAgentAccessCaso(id, agent)
-
+    // Leer el caso actualizado de la DB para retornar la lista correcta
+    const casoActualizado = db.get(id)
     return NextResponse.json({ 
       success: true, 
       message: `Acceso otorgado a ${agent}`,
-      agentesAcceso: caso.agentesAcceso
+      agentesAcceso: casoActualizado?.agentesAcceso ?? []
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
