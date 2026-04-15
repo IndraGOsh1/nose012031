@@ -227,7 +227,7 @@ export async function uploadImageToWebhook(imageBuffer: Buffer, filename: string
   if (!ALLANAMIENTO_WEBHOOK) return null
   try {
     const formData = new FormData()
-    const blob = new Blob([imageBuffer.buffer.slice(imageBuffer.byteOffset, imageBuffer.byteOffset + imageBuffer.byteLength)], { type: 'image/png' })
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' })
     formData.append('file', blob, filename)
     formData.append('payload_json', JSON.stringify({
       embeds: [{
