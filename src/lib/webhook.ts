@@ -187,15 +187,16 @@ export const logRegistroImportante = (accion: 'Ascenso' | 'Descenso' | 'Sanción
     ],
   })
 
-export function logInviteCodes(codes: string[], por: string, rol: string) {
+export function logInviteCodes(accion: string, codigo: string, rol: string, por: string) {
   return logWebhook({
     type: 'keys',
-    title: '🎫 Códigos de Invitación Generados',
+    title: `🎫 Código de Invitación — ${accion}`,
     color: COLORS.purple,
     fields: [
-      { name: 'Generados por', value: por, inline: true },
-      { name: 'Rol asignado', value: rol, inline: true },
-      { name: 'Códigos', value: codes.join(', '), inline: false },
+      { name: 'Acción',  value: accion,  inline: true },
+      { name: 'Código',  value: codigo,  inline: true },
+      { name: 'Rol',     value: rol,     inline: true },
+      { name: 'Por',     value: por,     inline: true },
     ],
   })
 }
@@ -357,4 +358,3 @@ export function logAllanamientoEjecutado(params: {
     ]
   )
 }
-
