@@ -253,15 +253,28 @@ export function logAllanamiento(title: string, description: string, color?: numb
   return sendAllanamientoWebhook(title, description, color ?? COLORS.blue, fields)
 }
 
-export function logAllanamientoCreado(numero: string, direccion: string, solicitante: string) {
+export function logAllanamientoCreado(params: {
+  numero: string
+  direccion: string
+  solicitadoPor?: string
+  sospechoso?: string
+  descripcion?: string
+  callsignSolicitante?: string | null
+  numeroAgenteSolicitante?: string | null
+  pngBuffer?: Buffer
+}) {
   return sendAllanamientoWebhook(
     `📥 Nueva Solicitud de Allanamiento`,
     `Se ha creado una nueva solicitud de allanamiento.`,
     COLORS.orange,
     [
-      { name: 'Número', value: numero, inline: true },
-      { name: 'Dirección', value: direccion, inline: true },
-      { name: 'Solicitante', value: solicitante, inline: true },
+      { name: 'Número',      value: params.numero,            inline: true },
+      { name: 'Dirección',   value: params.direccion,         inline: true },
+      ...(params.solicitadoPor ? [{ name: 'Solicitante', value: params.solicitadoPor, inline: true }] : []),
+      ...(params.sospechoso   ? [{ name: 'Sospechoso',  value: params.sospechoso,    inline: true }] : []),
+      ...(params.descripcion  ? [{ name: 'Descripción', value: params.descripcion,   inline: false }] : []),
+      ...(params.callsignSolicitante       ? [{ name: 'Callsign',  value: params.callsignSolicitante,       inline: true }] : []),
+      ...(params.numeroAgenteSolicitante   ? [{ name: 'N° Agente', value: params.numeroAgenteSolicitante,   inline: true }] : []),
     ]
   )
 }
