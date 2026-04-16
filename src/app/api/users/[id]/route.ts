@@ -17,8 +17,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const db = await getDB()
   const usr = db.users.get(id); if (!usr) return notFound('Usuario no encontrado')
   if (u.rol === 'supervisory' && usr.rol === 'command_staff') return forbidden()
-  const { rol, activo, discordId, agentNumber, nombre, callsign, vetado, vetoReason, congelado, congeladoReason, clases, newPassword } = await req.json().catch(()=>({}))
+  const { rol, activo, discordId, agentNumber, nombre, callsign, vetado, vetoReason, congelado, congeladoReason, clases, newPassword, avatarUrl } = await req.json().catch(()=>({}))
   const nextUser = { ...usr }
+
+  // ── Self-update for avatar ──────────────────────────────────────────────────
+  if (usr.id === u.id && avatarUrl !== undefined) {
+    nextUser.avatarUrl = avatarUrl ? String(avatarUrl).trim().slice(0, 500) : null
+    try {
+      await persistUser(nextUser)
+      cacheMapSet(db.users, id, nextUser)
+      const { passwordHash:_, ...safe } = nextUser
+      return NextResponse.json({ mensaje:'✅ Perfil actualizado', usuario:safe })
+    } catch {
+      return NextResponse.json({ error: 'Error al actualizar perfil' }, { status: 500 })
+    }
+  }
 
   // ── Password reset ──────────────────────────────────────────────────────────
   // command_staff can reset any account's password (except their own).

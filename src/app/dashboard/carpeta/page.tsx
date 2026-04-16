@@ -1,48 +1,31 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { 
-  Plus, Trash2, FileText, StickyNote, Lock, X, CheckCircle, AlertCircle, 
-  ChevronDown, ChevronUp, Search, User, MessageSquare, Users, FolderOpen, 
-  FolderPlus, Shield, ArrowRightLeft, RefreshCw, Settings, Send, Award, Activity
-} from 'lucide-react'
-import { 
-  getCarpeta, getStoredUser, crearAnotacion, borrarCarpetaItem, getAgente, 
-  crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta, 
-  subscribeStoredUser, addAgentToCarpeta, removeAgentFromCarpeta, 
-  getPersonal, getCarpetasAdmin, setCarpetaSupervisor, crearCarpetaAdmin, 
-  asignarCarpetaAdmin 
-} from '@/lib/client'
+import { Plus, Trash2, FileText, StickyNote, Lock, X, CheckCircle, AlertCircle, Search, MessageSquare, RefreshCw, Send, Award, Activity } from 'lucide-react'
+import { getCarpeta, getStoredUser, crearAnotacion, borrarCarpetaItem, getAgente, crearHiloCarpeta, enviarMensajeHiloCarpeta, setEstadoHiloCarpeta, subscribeStoredUser, addAgentToCarpeta, removeAgentFromCarpeta, getPersonal, getCarpetasAdmin } from '@/lib/client'
 import { uiConfirm } from '@/lib/ui-dialog'
 import './carpeta.css'
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 function formatThreadParticipants(participantes: string[] = []) {
   return participantes.join(', ')
 }
 
-function sectionLabel(raw: string) {
-  const value = String(raw || 'General').trim()
-  return value || 'General'
-}
-
-function Toast({ msg, ok, onClose }: { msg:string; ok:boolean; onClose:()=>void }) {
+function Toast({ msg, ok, onClose }: { msg: string; ok: boolean; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [])
   return (
-    <div className={`fixed bottom-5 right-5 z-[100] flex items-center gap-2 px-4 py-3 border font-mono text-xs ${ok?'bg-green-900/40 border-green-700 text-green-300':'bg-red-900/40 border-red-700 text-red-300'}`}>
-      {ok?<CheckCircle size={13}/>:<AlertCircle size={13}/>}{msg}
+    <div className={`fixed bottom-5 right-5 z-[100] flex items-center gap-2 px-4 py-3 border font-mono text-xs ${ok ? 'bg-green-900/40 border-green-700 text-green-300' : 'bg-red-900/40 border-red-700 text-red-300'}`}>
+      {ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />}
+      {msg}
     </div>
   )
 }
 
-// ── Personal search dropdown ────────────────────────────────────────────
 function PersonalSearchDropdown({ onSelect, placeholder = 'Buscar agente...' }: { onSelect: (agente: any) => void; placeholder?: string }) {
-  const [query, setQuery]       = useState('')
-  const [results, setResults]   = useState<any[]>([])
-  const [open, setOpen]         = useState(false)
-  const [loading, setLoading]   = useState(false)
-  const containerRef            = useRef<HTMLDivElement>(null)
-  const debounceRef             = useRef<ReturnType<typeof setTimeout>>()
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   const search = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); return }
@@ -111,58 +94,55 @@ function PersonalSearchDropdown({ onSelect, placeholder = 'Buscar agente...' }: 
   )
 }
 
-// ── Main Page Component ───────────────────────────────────────────────
-
 export default function CarpetaPage() {
   const [user, setUser] = useState<any>(null)
   const [ownCarpeta, setOwnCarpeta] = useState<any>(null)
   const [ownAgente, setOwnAgente] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<{msg:string, ok:boolean} | null>(null)
-  
-  // UI State
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+
   const [activeTab, setActiveTab] = useState<'carpeta' | 'supervisory' | 'admin'>('carpeta')
   const [activeSubTab, setActiveSubTab] = useState<'hilos' | 'registros' | 'condecoraciones' | 'chat'>('hilos')
   const [activeSvSub, setActiveSvSub] = useState<'agentes' | 'reportes' | 'sanciones' | 'condecorar'>('agentes')
   const [activeAdSub, setActiveAdSub] = useState<'personal' | 'ascensos' | 'sheet' | 'log'>('personal')
-  const [clock, setClock] = useState('')
-  useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC')
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
-  
-  // Staff State
+
   const [staffAgents, setStaffAgents] = useState<any[]>([])
   const [sidebarSearch, setSidebarSearch] = useState('')
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
   const [selectedCarpeta, setSelectedCarpeta] = useState<any>(null)
   const [selectedLoading, setSelectedLoading] = useState(false)
-  
-  // Action States
+
   const [threadReply, setThreadReply] = useState('')
   const [saving, setSaving] = useState(false)
   const [expandedHilo, setExpandedHilo] = useState<string | null>(null)
-  const [logs, setLogs] = useState<{ts: string, msg: string}[]>([])
+  const [logs, setLogs] = useState<{ ts: string; msg: string }[]>([])
+  const [showAvatarEdit, setShowAvatarEdit] = useState(false)
+  const [newAvatarUrl, setNewAvatarUrl] = useState('')
 
   const isStaff = ['command_staff', 'supervisory'].includes(user?.rol)
   const isAdmin = user?.rol === 'command_staff'
 
-  // Load Initial Data
+  function addLog(msg: string) {
+    const now = new Date()
+    const ts = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    setLogs(prev => [{ ts, msg }, ...prev].slice(0, 50))
+  }
+
   useEffect(() => {
     const parsed = getStoredUser()
     const unsubscribe = subscribeStoredUser(setUser)
     if (parsed) {
       setUser(parsed)
+      setNewAvatarUrl(parsed.avatarUrl || '')
       loadOwnData(parsed)
       if (['command_staff', 'supervisory'].includes(parsed.rol)) {
         loadStaffAgents()
       }
       addLog(`Sesión iniciada como ${parsed.nombre || parsed.username}`)
 
-      // Sincronización automática al entrar
       const lastSync = localStorage.getItem('fib_last_auto_sync')
       const now = Date.now()
-      if (!lastSync || now - Number(lastSync) > 10 * 60 * 1000) { // Cada 10 min
+      if (!lastSync || now - Number(lastSync) > 10 * 60 * 1000) {
         syncSheet().then(() => {
           localStorage.setItem('fib_last_auto_sync', String(now))
         })
@@ -173,10 +153,26 @@ export default function CarpetaPage() {
     return () => unsubscribe()
   }, [])
 
-  function addLog(msg: string) {
-    const now = new Date()
-    const ts = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
-    setLogs(prev => [{ts, msg}, ...prev].slice(0, 50))
+  async function updateAvatar() {
+    if (!user?.id) return
+    setSaving(true)
+    try {
+      const token = localStorage.getItem('fib_token') || ''
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ avatarUrl: newAvatarUrl.trim() || null })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al actualizar avatar')
+
+      setToast({ msg: 'Avatar actualizado correctamente', ok: true })
+      setShowAvatarEdit(false)
+    } catch (e: any) {
+      setToast({ msg: e.message, ok: false })
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function loadOwnData(u: any) {
@@ -229,7 +225,6 @@ export default function CarpetaPage() {
     }
   }, [])
 
-  // Actions
   async function syncSheet() {
     setToast({ msg: 'Sincronizando con Spreadsheet...', ok: true })
     try {
@@ -240,11 +235,10 @@ export default function CarpetaPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error en la sincronización')
-      
+
       setToast({ msg: data.mensaje || 'Sincronización completada', ok: true })
       addLog(data.mensaje)
-      
-      // Recargar datos locales
+
       await loadStaffAgents()
       await loadOwnData(user)
       if (selectedAgent) {
@@ -256,14 +250,14 @@ export default function CarpetaPage() {
     }
   }
 
-  async function responderHilo(hiloId: string, ownerUsername?: string) {
+  async function responderHilo(hiloId: string) {
     if (!threadReply.trim()) return
     setSaving(true)
     try {
-      await enviarMensajeHiloCarpeta(hiloId, threadReply.trim(), ownerUsername)
+      await enviarMensajeHiloCarpeta(hiloId, threadReply.trim(), selectedAgent?.username)
       addLog(`Respuesta enviada en hilo #${hiloId}`)
       setThreadReply('')
-      if (ownerUsername) {
+      if (selectedAgent) {
         await loadAgentCarpeta(selectedAgent)
       } else {
         const c = await getCarpeta()
@@ -281,7 +275,7 @@ export default function CarpetaPage() {
     if (!titulo) return
     const participantesStr = prompt('Participantes (separados por coma, ej: user1, user2):') || ''
     const participantes = participantesStr.split(',').map(s => s.trim()).filter(Boolean)
-    
+
     setSaving(true)
     try {
       await crearHiloCarpeta({ titulo, descripcion: '', participantes })
@@ -296,7 +290,6 @@ export default function CarpetaPage() {
     }
   }
 
-  // Derived Data
   const currentAgente = selectedAgent ? {
     nombre: selectedAgent.nombre,
     rango: selectedAgent.rango,
@@ -305,7 +298,8 @@ export default function CarpetaPage() {
     estado: selectedAgent.activo ? 'Activo' : 'Inactivo',
     sLeves: selectedAgent.totalAnotaciones || 0,
     sModeradas: selectedAgent.totalDocumentos || 0,
-    sGraves: selectedAgent.totalHilos || 0
+    sGraves: selectedAgent.totalHilos || 0,
+    avatarUrl: selectedAgent.avatarUrl
   } : (ownAgente ? {
     nombre: ownAgente.nombre,
     rango: ownAgente.rango,
@@ -314,13 +308,14 @@ export default function CarpetaPage() {
     estado: ownAgente.estado,
     sLeves: ownAgente.sLeves || 0,
     sModeradas: ownAgente.sModeradas || 0,
-    sGraves: ownAgente.sGraves || 0
+    sGraves: ownAgente.sGraves || 0,
+    avatarUrl: user?.avatarUrl
   } : null)
 
   const currentCarpeta = selectedAgent ? selectedCarpeta : ownCarpeta
 
-  const filteredAgents = staffAgents.filter(a => 
-    !sidebarSearch || 
+  const filteredAgents = staffAgents.filter(a =>
+    !sidebarSearch ||
     a.nombre?.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
     a.username?.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
     String(a.agentNumber).includes(sidebarSearch)
@@ -332,18 +327,24 @@ export default function CarpetaPage() {
     <div className="fib-panel-container">
       {toast && <Toast msg={toast.msg} ok={toast.ok} onClose={() => setToast(null)} />}
 
-      {/* TOPBAR */}
       <div className="fib-topbar">
         <span className="fib-logo">FIB</span>
         <span className="fib-topbar-sep">|</span>
         <span className="fib-topbar-label">INTEGRAL TACTICAL COMMAND</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)', fontFamily: 'Share Tech Mono, monospace' }}>{clock}</span>
-          <button className="fib-sync-btn" style={{ marginLeft: 0 }} onClick={syncSheet}>↻ SYNC SHEET</button>
-        </div>
+        <span className={`fib-badge-rank ${user?.rol === 'command_staff' ? 'fib-badge-cs' : user?.rol === 'supervisory' ? 'fib-badge-sv' : 'fib-badge-fa'}`}>
+          {user?.rol?.replace('_', ' ').toUpperCase()}
+        </span>
+        <span className="fib-topbar-sep" style={{ marginLeft: '8px' }}>|</span>
+        <span className="fib-status-online">● ONLINE</span>
+        <span className="fib-topbar-agent">
+          {user?.nombre || user?.username} {user?.callsign ? `· ${user.callsign}` : ''} {user?.agentNumber ? `· #${user.agentNumber}` : ''}
+        </span>
+        <button className="fib-sync-btn" onClick={syncSheet}>↻ SYNC SHEET</button>
+        <span className="fib-sync-status">
+          <span className="fib-sync-indicator"><span className="fib-sync-dot"></span><span>SINCRONIZADO</span></span>
+        </span>
       </div>
 
-      {/* NAV */}
       <div className="fib-nav">
         <div className={`fib-nav-tab ${activeTab === 'carpeta' ? 'active' : ''}`} onClick={() => setActiveTab('carpeta')}>
           {isStaff && selectedAgent ? `CARPETA: ${selectedAgent.nombre}` : 'CARPETA PROPIA'}
@@ -361,20 +362,54 @@ export default function CarpetaPage() {
       </div>
 
       <div className="fib-main">
-        {/* ═══════════════════ CARPETA ═══════════════════ */}
         {activeTab === 'carpeta' && (
           <div id="tab-carpeta">
             <div className="fib-section-label">// expediente del agente</div>
 
-            {/* AGENT HEADER */}
             <div className="fib-agent-header">
-              <div className="fib-agent-av">{currentAgente?.nombre?.[0] || '?'}</div>
+              <div
+                className="fib-agent-av"
+                style={{
+                  backgroundImage: currentAgente?.avatarUrl ? `url(${currentAgente.avatarUrl})` : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              >
+                {!currentAgente?.avatarUrl && (currentAgente?.nombre?.[0] || '?')}
+              </div>
               <div style={{ flex: 1 }}>
-                <div className="fib-agent-main-name">{currentAgente?.nombre || 'Agente sin expediente'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="fib-agent-main-name">{currentAgente?.nombre || 'Agente sin expediente'}</div>
+                  {!selectedAgent && (
+                    <button
+                      onClick={() => setShowAvatarEdit(!showAvatarEdit)}
+                      className="fib-action-btn"
+                      style={{ fontSize: '9px', padding: '2px 6px' }}
+                    >
+                      {showAvatarEdit ? 'CERRAR' : 'CAMBIAR AVATAR'}
+                    </button>
+                  )}
+                </div>
                 <div className="fib-agent-callsign">{currentAgente?.rango || 'Sin rango'} &nbsp;·&nbsp; #{currentAgente?.numero || '0000'}</div>
+
+                {showAvatarEdit && !selectedAgent && (
+                  <div className="fib-mt-12" style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      className="fib-entry-input"
+                      placeholder="URL de imagen (ej: imgur.com/...)"
+                      value={newAvatarUrl}
+                      onChange={e => setNewAvatarUrl(e.target.value)}
+                      style={{ maxWidth: '300px' }}
+                    />
+                    <button className="fib-add-btn" onClick={updateAvatar} disabled={saving}>
+                      {saving ? '...' : 'GUARDAR'}
+                    </button>
+                  </div>
+                )}
+
                 <div className="fib-agent-meta-row">
                   <div className="fib-meta-item"><span className="fib-meta-label">Rango</span><span className="fib-meta-value highlight">{currentAgente?.rango || '—'}</span></div>
-                  <div className="fib-meta-item"><span className="fib-meta-label">Sección</span><span className="fib-meta-value">{currentAgente?.seccion || '—'}</span></div>
+                  <div className="fib-meta-item"><span className="fib-meta-label">Ramas</span><span className="fib-meta-value">{currentAgente?.seccion || '—'}</span></div>
                   <div className="fib-meta-item"><span className="fib-meta-label">Estado</span><span className="fib-meta-value" style={{ color: currentAgente?.estado === 'Activo' ? 'var(--fib-green)' : 'var(--fib-red2)' }}>{currentAgente?.estado || '—'}</span></div>
                 </div>
               </div>
@@ -385,38 +420,36 @@ export default function CarpetaPage() {
               </div>
             </div>
 
-            {/* GRID */}
             <div className="fib-carpeta-grid" style={{ gridTemplateColumns: isStaff ? '240px 1fr' : '1fr' }}>
-              {/* LEFT: agent list (Staff only) */}
               {isStaff && (
                 <div className="fib-left-panel">
                   <div className="fib-section-label" style={{ marginBottom: '6px' }}>personal</div>
-                  <input 
-                    className="fib-search-input" 
-                    placeholder="Buscar agente..." 
+                  <input
+                    className="fib-search-input"
+                    placeholder="Buscar agente..."
                     value={sidebarSearch}
                     onChange={e => setSidebarSearch(e.target.value)}
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '600px', overflowY: 'auto' }}>
-                    <div 
+                    <div
                       className={`fib-agent-list-item ${!selectedAgent ? 'active' : ''}`}
                       onClick={() => loadAgentCarpeta(null)}
                     >
-                      <div className="fib-av-sm">{user?.nombre?.[0] || 'U'}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="fib-ali-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Mi Carpeta</div>
+                      <div className="fib-av-sm">{user?.nombre?.[0]}</div>
+                      <div>
+                        <div className="fib-ali-name">Mi Carpeta</div>
                         <div className="fib-ali-role">Propios datos</div>
                       </div>
                     </div>
                     {filteredAgents.map(a => (
-                      <div 
-                        key={a.username} 
+                      <div
+                        key={a.username}
                         className={`fib-agent-list-item ${selectedAgent?.username === a.username ? 'active' : ''}`}
                         onClick={() => loadAgentCarpeta(a)}
                       >
                         <div className="fib-av-sm">{a.nombre?.[0]}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="fib-ali-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.nombre}</div>
+                        <div>
+                          <div className="fib-ali-name">{a.nombre}</div>
                           <div className="fib-ali-role">{a.rango} · #{a.agentNumber}</div>
                         </div>
                         <div className={`fib-dot ${a.activo ? 'fib-dot-on' : 'fib-dot-off'}`} style={{ marginLeft: 'auto' }}></div>
@@ -426,7 +459,6 @@ export default function CarpetaPage() {
                 </div>
               )}
 
-              {/* RIGHT: content */}
               <div>
                 <div className="fib-subtabs" id="carpeta-subtabs">
                   <div className={`fib-subtab ${activeSubTab === 'hilos' ? 'active' : ''}`} onClick={() => setActiveSubTab('hilos')}>HILOS</div>
@@ -439,7 +471,6 @@ export default function CarpetaPage() {
                   <div className="flex items-center justify-center p-20"><p className="fib-topbar-label">ACCEDIENDO A ARCHIVOS...</p></div>
                 ) : (
                   <>
-                    {/* HILOS */}
                     {activeSubTab === 'hilos' && (
                       <div id="sub-hilos">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -459,7 +490,7 @@ export default function CarpetaPage() {
                                   <div className="fib-hilo-expanded">
                                     <div className="fib-hilo-exp-header" onClick={() => setExpandedHilo(null)}>
                                       <div className="fib-hilo-exp-title">
-                                        <span className={`fib-hilo-type fib-ht-caso`}>HILO</span> &nbsp;{hilo.titulo}
+                                        <span className="fib-hilo-type fib-ht-caso">HILO</span> &nbsp;{hilo.titulo}
                                       </div>
                                       <button className="fib-close-x">✕</button>
                                     </div>
@@ -472,16 +503,16 @@ export default function CarpetaPage() {
                                       ))}
                                     </div>
                                     <div className="fib-add-entry-row">
-                                      <input 
-                                        className="fib-entry-input" 
+                                      <input
+                                        className="fib-entry-input"
                                         placeholder="Escribe una respuesta o actualización..."
                                         value={threadReply}
                                         onChange={e => setThreadReply(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && responderHilo(hilo.id, selectedAgent?.username)}
+                                        onKeyDown={e => e.key === 'Enter' && responderHilo(hilo.id)}
                                       />
-                                      <button 
-                                        className="fib-add-btn" 
-                                        onClick={() => responderHilo(hilo.id, selectedAgent?.username)}
+                                      <button
+                                        className="fib-add-btn"
+                                        onClick={() => responderHilo(hilo.id)}
                                         disabled={saving || !threadReply.trim()}
                                       >
                                         {saving ? '...' : 'AÑADIR'}
@@ -493,7 +524,7 @@ export default function CarpetaPage() {
                                     <div className="fib-hilo-top">
                                       <div className="fib-hilo-title">
                                         {hilo.estado === 'abierto' && <span className="fib-unread-dot"></span>}
-                                        <span className={`fib-hilo-type fib-ht-caso`}>HILO</span>
+                                        <span className="fib-hilo-type fib-ht-caso">HILO</span>
                                         {hilo.titulo}
                                       </div>
                                       <div className="fib-hilo-meta">{new Date(hilo.fecha || Date.now()).toLocaleDateString('es')}</div>
@@ -511,16 +542,13 @@ export default function CarpetaPage() {
                       </div>
                     )}
 
-                    {/* REGISTROS */}
                     {activeSubTab === 'registros' && (
                       <div id="sub-registros">
                         <div className="fib-section-label">anotaciones y documentos operativos</div>
                         <div style={{ overflowX: 'auto' }}>
                           <table className="fib-records-table">
                             <thead>
-                              <tr>
-                                <th>Tipo</th><th>Título</th><th>Fecha</th><th>Información</th>
-                              </tr>
+                              <tr><th>Tipo</th><th>Título</th><th>Fecha</th><th>Información</th></tr>
                             </thead>
                             <tbody>
                               {currentCarpeta?.anotaciones?.length === 0 && currentCarpeta?.documentos?.length === 0 ? (
@@ -551,7 +579,6 @@ export default function CarpetaPage() {
                       </div>
                     )}
 
-                    {/* CONDECORACIONES */}
                     {activeSubTab === 'condecoraciones' && (
                       <div id="sub-condecoraciones">
                         <div className="fib-section-label">condecoraciones y méritos</div>
@@ -562,7 +589,6 @@ export default function CarpetaPage() {
                       </div>
                     )}
 
-                    {/* CHAT */}
                     {activeSubTab === 'chat' && (
                       <div id="sub-chat">
                         <div className="fib-section-label">mensajes internos del sistema</div>
@@ -596,7 +622,6 @@ export default function CarpetaPage() {
           </div>
         )}
 
-        {/* ═══════════════════ SUPERVISORY ═══════════════════ */}
         {activeTab === 'supervisory' && isStaff && (
           <div id="tab-supervisory">
             <div className="fib-section-label">// supervisory area — acceso restringido</div>
@@ -629,7 +654,7 @@ export default function CarpetaPage() {
                 </div>
               </div>
             )}
-            
+
             {activeSvSub === 'reportes' && (
               <div className="fib-panel-card">
                 <div className="fib-panel-card-header">reportes operativos pendientes</div>
@@ -669,7 +694,6 @@ export default function CarpetaPage() {
           </div>
         )}
 
-        {/* ═══════════════════ ADMIN ═══════════════════ */}
         {activeTab === 'admin' && isAdmin && (
           <div id="tab-admin">
             <div className="fib-section-label">// administración — command staff</div>
@@ -686,12 +710,12 @@ export default function CarpetaPage() {
                   <div style={{ overflowX: 'auto' }}>
                     <table className="fib-records-table">
                       <thead>
-                        <tr><th>Agente</th><th>Rango</th><th>Sección</th><th>Estado</th><th>Acciones</th></tr>
+                        <tr><th>Agente</th><th>Rango</th><th>Ramas</th><th>Estado</th><th>Acciones</th></tr>
                       </thead>
                       <tbody>
                         {staffAgents.map(a => (
                           <tr key={a.username}>
-                            <td><strong>{a.nombre}</strong><br/><span className="opacity-60">#{a.agentNumber}</span></td>
+                            <td><strong>{a.nombre}</strong><br /><span className="opacity-60">#{a.agentNumber}</span></td>
                             <td>{a.rango}</td>
                             <td>{a.seccion || '—'}</td>
                             <td><span className={`fib-record-badge ${a.activo ? 'fib-rb-activo' : 'fib-rb-cerrado'}`}>{a.activo ? 'ACTIVO' : 'INACTIVO'}</span></td>
@@ -755,7 +779,6 @@ export default function CarpetaPage() {
             )}
           </div>
         )}
-
       </div>
     </div>
   )

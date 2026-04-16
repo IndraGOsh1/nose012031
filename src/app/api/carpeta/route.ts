@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
   const isElevated = ['command_staff', 'supervisory'].includes(u.rol)
 
   if (scope === 'admin') {
-    // Solo command_staff y supervisory pueden listar todas las carpetas
     if (!isElevated) return forbidden()
     try {
       const db = await getDB()
@@ -107,16 +106,13 @@ export async function GET(req: NextRequest) {
     targetUsername = matched?.username || null
   }
 
-  // If requesting another user's carpeta, validate access
   if (targetUsername && targetUsername !== u.username) {
     const carpeta = await getCarpeta(targetUsername)
     
-    // Check if user has access to this carpeta
     if (!canAccessCarpeta(carpeta, u.username, u.rol)) {
       return forbidden()
     }
 
-    // LOG ACCESS
     await recordAuditEvent({
       level: 'info',
       source: 'personal',
@@ -152,7 +148,6 @@ export async function POST(req: NextRequest) {
   const carpeta = await getCarpeta(targetUsername)
 
   if (body.tipo === 'supervisor') {
-    // Solo staff elevado puede asignar o remover el supervisor de una carpeta
     if (!isElevated) return forbidden()
     const supervisorValue = body.supervisor ? String(body.supervisor).trim() : null
     const next = { ...carpeta, supervisor: supervisorValue || null }

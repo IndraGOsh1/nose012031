@@ -21,6 +21,7 @@ export interface User {
   congeladoReason?: string | null
   congeladoAt?:     string | null
   congeladoPor?:    string | null
+  avatarUrl?:       string | null
 }
 
 export interface Invite {

@@ -88,7 +88,6 @@ export async function recordAuditEvent(input: {
 
   await persistentMapSet(db, entry.id, entry)
 
-  // Auto-send to Discord if level is warn/error OR it's a critical event
   const isCritical = ['auth','config','personal'].includes(entry.source) || entry.level !== 'info'
   if (isCritical) {
     void logAudit(entry).catch(() => {})
@@ -144,37 +143,33 @@ function buildDiscordPayload(entry: AuditLogEntry, resentBy: string) {
     metaLines.length ? 'Meta:\n' + metaLines.join('\n') : 'Meta: —',
   ].join('\n')
 
-  return { content: content.slice(0, 1900) }
+  return { content }
 }
 
-export async function resendAuditEventsToDiscord(ids: string[], resentBy: string) {
-  const webhookUrl = getAuditWebhookUrl()
-  if (!webhookUrl) {
-    throw new Error('No existe webhook de auditoria configurado (DISCORD_WEBHOOK_AUDIT/IMPORTANTE/EXTRAS).')
-  }
+export async function resendAuditEventsToDiscord(eventIds: string[], resentBy: string): Promise<{ success: boolean; resent: number; failed: number }> {
+  const url = getAuditWebhookUrl()
+  if (!url) return { success: false, resent: 0, failed: eventIds.length }
 
   const db = await getAuditLogsDB()
-  const uniqueIds = Array.from(new Set(ids.map((x) => String(x).trim()).filter(Boolean)))
-  const rows = uniqueIds.map((id) => db.get(id)).filter(Boolean) as AuditLogEntry[]
-  let sent = 0
+  let resent = 0
+  let failed = 0
 
-  for (const row of rows) {
-    const payload = buildDiscordPayload(row, resentBy)
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '')
-      throw new Error(`Discord webhook failed (${res.status}): ${txt.slice(0, 300)}`)
+  for (const id of eventIds) {
+    const entry = db.get(id)
+    if (!entry) { failed++; continue }
+
+    const payload = buildDiscordPayload(entry, resentBy)
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: payload.content }),
+      })
+      resent++
+    } catch {
+      failed++
     }
-
-    row.resentCount = (row.resentCount || 0) + 1
-    row.lastResentAt = new Date().toISOString()
-    await persistentMapSet(db, row.id, row)
-    sent += 1
   }
 
-  return { requested: uniqueIds.length, found: rows.length, sent }
+  return { success: failed === 0, resent, failed }
 }
