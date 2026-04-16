@@ -1,81 +1,153 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Plus, RefreshCw, X, CheckCircle, AlertCircle, Send, FileText, Check, XCircle, PenTool, Trash2, Pencil, Camera, MapPin, AlertTriangle, Clock, Shield } from 'lucide-react'
-import { getAllanamientos, crearAllanamiento, editarAllanamiento, getAllanamiento, getStoredUser, borrarAllanamiento, subscribeStoredUser } from '@/lib/client'
+import {
+  Plus, RefreshCw, X, CheckCircle, AlertCircle, Send,
+  FileText, Check, XCircle, PenTool, Trash2, Pencil,
+  Image as ImageIcon, ExternalLink, Camera, Shield, Link2
+} from 'lucide-react'
+import {
+  getAllanamientos, crearAllanamiento, editarAllanamiento,
+  getAllanamiento, getStoredUser, borrarAllanamiento,
+  subscribeStoredUser, getCasos
+} from '@/lib/client'
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog'
+import '../carpeta/carpeta.css'
 
-const ESTADO_CFG: Record<string, { label: string; cls: string; icon: string }> = {
-  pendiente:  { label: 'Pendiente',  cls: 'border-yellow-700/60 bg-yellow-900/15 text-yellow-400', icon: '⏳' },
-  autorizado: { label: 'Autorizado', cls: 'border-green-700/60 bg-green-900/15 text-green-400',  icon: '✅' },
-  denegado:   { label: 'Denegado',   cls: 'border-red-700/60 bg-red-900/15 text-red-400',        icon: '❌' },
-  ejecutado:  { label: 'Ejecutado',  cls: 'border-blue-700/60 bg-blue-900/15 text-blue-400',     icon: '⚡' },
+/* ── Helpers ──────────────────────────────────────────────────── */
+function normalizeImgUrl(raw: string) {
+  const s = String(raw || '').trim()
+  const d = s.match(/^https?:\/\/i\.imgur\.com\/([a-zA-Z0-9]+)(\.(png|jpg|jpeg|webp|gif))?(\?.*)?$/i)
+  if (d) return `https://i.imgur.com/${d[1]}.${d[3] || 'png'}`
+  const p = s.match(/^https?:\/\/(?:www\.)?imgur\.com\/(?:gallery\/|a\/)?([a-zA-Z0-9]+)(\?.*)?$/i)
+  if (p) return `https://i.imgur.com/${p[1]}.png`
+  return s
+}
+function isImgUrl(raw: string) {
+  const s = normalizeImgUrl(String(raw || '').trim())
+  return /^https?:\/\//i.test(s) && /(imgur\.com|\.(png|jpg|jpeg|webp|gif)(\?.*)?)$/i.test(s)
+}
+function extractImgFromText(text: string) {
+  const m = String(text || '').match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i)
+    || String(text || '').match(/https?:\/\/(?:i\.)?imgur\.com\/[^\s]+/i)
+  return m ? m[0] : ''
+}
+// UTC clock synced
+function useUtcClock() {
+  const [time, setTime] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      setTime(now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC')
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return time
+}
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+function fmtDT(iso: string) {
+  return new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-function EstadoBadge({ estado }: { estado: string }) {
-  const cfg = ESTADO_CFG[estado] || { label: estado, cls: 'border-bg-border text-tx-muted', icon: '•' }
-  return (
-    <span className={`inline-flex items-center gap-1 font-mono text-[9px] tracking-widest uppercase px-2 py-0.5 border ${cfg.cls}`}>
-      {cfg.icon} {cfg.label}
-    </span>
-  )
+const ESTADO_STYLE: Record<string, string> = {
+  pendiente:  'fib-rb-pendiente',
+  autorizado: 'fib-rb-activo',
+  denegado:   'fib-rb-allanamiento',
+  ejecutado:  'fib-rb-caso',
 }
 
 function Toast({ msg, ok, onClose }: { msg: string; ok: boolean; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
   return (
-    <div className={`fixed bottom-5 right-5 z-[100] flex items-center gap-2 px-4 py-3 border font-mono text-xs shadow-xl ${ok ? 'bg-green-900/40 border-green-700 text-green-300' : 'bg-red-900/40 border-red-700 text-red-300'}`}>
-      {ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />} {msg}
+    <div className={`fixed bottom-5 right-5 z-[200] flex items-center gap-2 px-4 py-3 border font-mono text-xs ${ok ? 'bg-green-900/40 border-green-700 text-green-300' : 'bg-red-900/40 border-red-700 text-red-300'}`}>
+      {ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />}{msg}
     </div>
   )
 }
 
-function ModalCrear({ onClose, onSuccess }: { onClose: () => void; onSuccess: (m: string) => void }) {
-  const [form, setForm] = useState({ direccion: '', motivacion: '', descripcion: '', sospechoso: '', unidad: 'General' })
+/* ── ModalCrear ────────────────────────────────────────────────── */
+function ModalCrear({ user, onClose, onSuccess }: { user: any; onClose: () => void; onSuccess: (m: string) => void }) {
+  const [form, setForm] = useState({ direccion: '', motivacion: '', descripcion: '', sospechoso: '', unidad: 'General', casoVinculado: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm(p => ({ ...p, [k]: e.target.value }))
+  const [misCasos, setMisCasos] = useState<any[]>([])
+
+  useEffect(() => {
+    getCasos().then((d: any) => {
+      const list = Array.isArray(d) ? d : []
+      // Solo casos donde el usuario es agente asignado o lead
+      setMisCasos(list.filter((c: any) =>
+        c.agenteLead === user?.username ||
+        (c.agentesAsignados || []).includes(user?.username)
+      ))
+    }).catch(() => {})
+  }, [user])
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(p => ({ ...p, [k]: e.target.value }))
+
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(''); setLoading(true)
-    try { await crearAllanamiento(form); onSuccess('Solicitud enviada'); onClose() }
-    catch (err: any) { setError(err.message) } finally { setLoading(false) }
+    try {
+      await crearAllanamiento({ ...form, casoVinculado: form.casoVinculado || null })
+      onSuccess('Solicitud enviada'); onClose()
+    } catch (err: any) { setError(err.message) }
+    finally { setLoading(false) }
   }
+
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal w-full max-w-xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-bg-border bg-bg-surface">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)' }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'rgba(8,11,15,0.97)', border: '1px solid rgba(201,168,76,0.25)', maxWidth: 560, width: '100%', boxShadow: '0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(201,168,76,0.05)' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(201,168,76,0.15)', background: 'rgba(5,7,10,0.5)' }}>
           <div>
-            <span className="section-tag">// Nueva Solicitud</span>
-            <p className="font-display text-sm font-semibold tracking-wider uppercase text-tx-primary mt-0.5">Solicitud de Allanamiento</p>
+            <div className="fib-section-label" style={{ margin: 0 }}>// nueva solicitud</div>
+            <p className="text-sm font-bold tracking-widest uppercase mt-1" style={{ color: '#E8EEF5', fontFamily: 'Oswald, sans-serif' }}>Solicitud de Allanamiento</p>
           </div>
-          <button onClick={onClose} className="text-tx-muted hover:text-tx-primary p-1"><X size={15} /></button>
+          <button onClick={onClose} style={{ color: '#6B7F93' }}><X size={16} /></button>
         </div>
-        <form onSubmit={submit} className="p-5 flex flex-col gap-4">
+        <form onSubmit={submit} className="p-5 flex flex-col gap-3">
           <div>
-            <label className="label flex items-center gap-1"><MapPin size={9} /> Dirección / Ubicación *</label>
-            <input className="input" value={form.direccion} onChange={set('direccion')} placeholder="Calle 5 #23, Zona Industrial" required />
+            <label className="fib-form-label">Dirección / Ubicación *</label>
+            <input className="fib-form-ctrl w-full" value={form.direccion} onChange={set('direccion')} placeholder="Calle 5 #23, Zona Industrial" required />
           </div>
           <div>
-            <label className="label">Sospechoso(s)</label>
-            <input className="input" value={form.sospechoso} onChange={set('sospechoso')} placeholder="Nombre o descripción" />
+            <label className="fib-form-label">Sospechoso(s)</label>
+            <input className="fib-form-ctrl w-full" value={form.sospechoso} onChange={set('sospechoso')} placeholder="Nombre o descripción" />
           </div>
           <div>
-            <label className="label flex items-center gap-1"><AlertTriangle size={9} /> Motivación / Justificación Legal *</label>
-            <textarea className="input min-h-24 resize-none text-xs" value={form.motivacion} onChange={set('motivacion')} placeholder="Fundamento legal y evidencias que justifican el allanamiento..." required />
+            <label className="fib-form-label">Motivación / Justificación Legal *</label>
+            <textarea className="fib-form-ctrl w-full" style={{ minHeight: 88, resize: 'none', fontSize: 12 }} value={form.motivacion} onChange={set('motivacion')} placeholder="Fundamento legal y evidencias que justifican el allanamiento..." required />
           </div>
           <div>
-            <label className="label">Descripción del operativo</label>
-            <textarea className="input min-h-16 resize-none text-xs" value={form.descripcion} onChange={set('descripcion')} placeholder="Detalles adicionales..." />
+            <label className="fib-form-label">Descripción del operativo</label>
+            <textarea className="fib-form-ctrl w-full" style={{ minHeight: 60, resize: 'none', fontSize: 12 }} value={form.descripcion} onChange={set('descripcion')} placeholder="Detalles adicionales..." />
           </div>
-          <div>
-            <label className="label"><Shield size={9} className="inline mr-1" />Unidad</label>
-            <select className="input text-xs py-2" value={form.unidad} onChange={set('unidad')}>
-              {['General', 'CIRG', 'ERT', 'RRHH', 'SOG', 'VCTF'].map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
+          <div className="fib-form-grid">
+            <div>
+              <label className="fib-form-label">Unidad</label>
+              <select className="fib-form-ctrl" value={form.unidad} onChange={set('unidad')}>
+                {['General', 'CIRG', 'ERT', 'RRHH', 'SOG', 'VCTF'].map(u => <option key={u}>{u}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="fib-form-label flex items-center gap-1"><Link2 size={9} />Caso Vinculado (propio)</label>
+              <select className="fib-form-ctrl" value={form.casoVinculado} onChange={set('casoVinculado')}>
+                <option value="">— Sin caso vinculado —</option>
+                {misCasos.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.numeroCaso} · {c.titulo?.slice(0, 28)}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          {error && <p className="font-mono text-xs text-red-400 bg-red-900/10 border border-red-800/40 px-3 py-2">{error}</p>}
+          {error && <p className="font-mono text-xs text-red-400">{error}</p>}
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-ghost flex-1 justify-center">Cancelar</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">{loading ? 'Enviando...' : 'Enviar Solicitud'}</button>
+            <button type="button" onClick={onClose} className="fib-action-btn flex-1 py-2">Cancelar</button>
+            <button type="submit" disabled={loading} className="fib-add-btn flex-1" style={{ borderRadius: 3, fontSize: 11 }}>
+              {loading ? 'Enviando...' : 'ENVIAR SOLICITUD'}
+            </button>
           </div>
         </form>
       </div>
@@ -83,6 +155,7 @@ function ModalCrear({ onClose, onSuccess }: { onClose: () => void; onSuccess: (m
   )
 }
 
+/* ── ModalAllanamiento ─────────────────────────────────────────── */
 function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string; user: any; onClose: () => void; onAction: (m: string) => void }) {
   const [item, setItem] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -91,25 +164,32 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
   const [sending, setSending] = useState(false)
   const [hallazgo, setHallazgo] = useState('')
   const [propiedad, setPropiedad] = useState('')
-  const [evidenciaUrl, setEvidenciaUrl] = useState('')
-  const [tab, setTab] = useState<'info' | 'chat' | 'pdf'>('info')
+  const [evidLinks, setEvidLinks] = useState([''])
+  const [tab, setTab] = useState<'info' | 'chat' | 'album' | 'pdf'>('info')
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const atBottomRef = useRef(true)
   const isSuperv = ['command_staff', 'supervisory'].includes(user?.rol)
   const isCS = user?.rol === 'command_staff'
-  const [editForm, setEditForm] = useState({ numeroSolicitud: '', direccion: '', sospechoso: '', unidad: 'General', motivacion: '', descripcion: '', observaciones: '' })
 
-  function extractImageUrl(raw: string) {
-    const match = String(raw || '').match(/https?:\/\/[^\s]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s]*)?/i)
-    return match ? match[0] : ''
-  }
+  const [editForm, setEditForm] = useState({
+    numeroSolicitud: '', direccion: '', sospechoso: '', unidad: 'General',
+    motivacion: '', descripcion: '', observaciones: '',
+  })
 
   const load = useCallback(async () => {
     try {
       const d = await getAllanamiento(itemId)
       setItem(d)
-      setEditForm({ numeroSolicitud: d?.numeroSolicitud || '', direccion: d?.direccion || '', sospechoso: d?.sospechoso || '', unidad: d?.unidad || 'General', motivacion: d?.motivacion || '', descripcion: d?.descripcion || '', observaciones: d?.observaciones || '' })
+      setEditForm({
+        numeroSolicitud: d?.numeroSolicitud || '',
+        direccion: d?.direccion || '',
+        sospechoso: d?.sospechoso || '',
+        unidad: d?.unidad || 'General',
+        motivacion: d?.motivacion || '',
+        descripcion: d?.descripcion || '',
+        observaciones: d?.observaciones || '',
+      })
     } catch { }
     finally { setLoading(false) }
   }, [itemId])
@@ -129,371 +209,364 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
   async function doAction(accion: string, extra?: any) {
     setSending(true)
     try { await editarAllanamiento(itemId, { accion, motivo, ...extra }); await load(); onAction(`Acción: ${accion}`) }
-    catch (e: any) { uiAlert(e?.message || 'No se pudo ejecutar la acción', 'Allanamientos') } finally { setSending(false) }
+    catch (e: any) { uiAlert(e?.message || 'Error al ejecutar acción', 'Allanamientos') }
+    finally { setSending(false) }
   }
 
-  async function enviarMensajeChat(e: React.FormEvent) {
+  async function enviarMsg(e: React.FormEvent) {
     e.preventDefault(); if (!mensaje.trim()) return; setSending(true)
     try { await editarAllanamiento(itemId, { mensaje: mensaje.trim() }); setMensaje(''); await load() }
-    catch (e: any) { uiAlert(e?.message || 'No se pudo enviar el mensaje', 'Allanamientos') } finally { setSending(false) }
+    catch (e: any) { uiAlert(e?.message || 'No se pudo enviar', 'Allanamientos') }
+    finally { setSending(false) }
   }
 
-  async function enviarReporteHallazgo(e: React.FormEvent) {
+  async function registrarHallazgo(e: React.FormEvent) {
     e.preventDefault()
     if (!hallazgo.trim() || !propiedad.trim()) return
     setSending(true)
+    const urls = evidLinks.map(normalizeImgUrl).filter(l => /^https?:\/\//i.test(l))
     try {
-      await editarAllanamiento(itemId, { accion: 'reporte_hallazgo', hallazgo: hallazgo.trim(), propiedad: propiedad.trim(), evidenciaUrl: evidenciaUrl.trim() })
-      setHallazgo(''); setPropiedad(''); setEvidenciaUrl('')
-      await load(); onAction('Informe de hallazgo registrado')
-    } catch (e: any) { uiAlert(e?.message || 'No se pudo registrar el informe', 'Allanamientos') } finally { setSending(false) }
+      await editarAllanamiento(itemId, {
+        accion: 'reporte_hallazgo',
+        hallazgo: hallazgo.trim(),
+        propiedad: propiedad.trim(),
+        evidenciaUrl: urls[0] || '',
+      })
+      // Additional photos to album
+      for (const url of urls.slice(1)) {
+        await editarAllanamiento(itemId, { addFoto: url })
+      }
+      setHallazgo(''); setPropiedad(''); setEvidLinks([''])
+      await load(); onAction('Hallazgo registrado')
+    } catch (e: any) { uiAlert(e?.message || 'Error', 'Allanamientos') }
+    finally { setSending(false) }
+  }
+
+  async function addFotoToAlbum(url: string) {
+    if (!url.trim()) return
+    const normalized = normalizeImgUrl(url.trim())
+    if (!/^https?:\/\//i.test(normalized)) { uiAlert('URL inválida', 'Álbum'); return }
+    setSending(true)
+    try { await editarAllanamiento(itemId, { addFoto: normalized }); await load(); onAction('Foto añadida') }
+    catch (e: any) { uiAlert(e?.message || 'Error', 'Álbum') }
+    finally { setSending(false) }
   }
 
   async function descargarPDF() {
     if (!item) return; setSending(true)
     try {
-      const response = await fetch(`/api/allanamientos/${itemId}/download-pdf`)
-      if (!response.ok) throw new Error('Error downloading PDF')
-      const blob = await response.blob()
+      const res = await fetch(`/api/allanamientos/${itemId}/download-pdf`)
+      if (!res.ok) throw new Error('Error descargando PDF')
+      const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `allanamiento-${item.numeroSolicitud.replace(/[^a-zA-Z0-9-]/g, '-')}.pdf`
+      a.href = url; a.download = `allanamiento-${item.numeroSolicitud?.replace(/[^a-zA-Z0-9-]/g, '-')}.pdf`
       document.body.appendChild(a); a.click()
       window.URL.revokeObjectURL(url); document.body.removeChild(a)
       onAction('PDF descargado')
-    } catch (e: any) { uiAlert(e?.message || 'No se pudo descargar el PDF', 'Descarga PDF') } finally { setSending(false) }
+    } catch (e: any) { uiAlert(e?.message || 'Error', 'PDF') }
+    finally { setSending(false) }
   }
 
   if (loading) return (
-    <div className="modal-overlay">
-      <div className="modal p-12 text-center">
-        <div className="w-5 h-5 border border-accent-blue border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="font-mono text-[10px] text-tx-muted uppercase tracking-widest">Cargando expediente…</p>
-      </div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)' }}>
+      <div className="fib-panel-card p-8"><p className="fib-section-label" style={{ margin: 0 }}>cargando expediente...</p></div>
     </div>
   )
   if (!item) return null
 
   const canChat = isSuperv || (item.solicitadoPor === user?.username && item.estado === 'pendiente')
   const yafirmo = item.firmas?.some((f: any) => f.username === user?.username)
+  const album: string[] = item.albumFotos || []
 
-  // Group chat messages
-  const grouped = (item.mensajes || []).reduce((acc: any[], msg: any, i: number) => {
-    const tiposEspeciales = ['sistema', 'accion', 'documento', 'informe']
-    if (tiposEspeciales.includes(msg.tipo)) { acc.push({ ...msg, msgs: [msg] }); return acc }
-    const prev = (item.mensajes || [])[i - 1]
-    const sameAuthor = prev?.autor === msg.autor
-    const closeTime = prev && (new Date(msg.fecha).getTime() - new Date(prev.fecha).getTime()) < 120000
-    const prevSpecial = prev && tiposEspeciales.includes(prev.tipo)
-    if (sameAuthor && closeTime && !prevSpecial) {
-      acc[acc.length - 1].msgs.push(msg)
-    } else {
-      acc.push({ ...msg, msgs: [msg] })
-    }
-    return acc
-  }, [])
+  const TABS = [
+    { id: 'info' as const,  label: 'Información' },
+    { id: 'chat' as const,  label: `Chat (${item.mensajes?.length || 0})` },
+    { id: 'album' as const, label: `Álbum (${album.length})` },
+    { id: 'pdf' as const,   label: 'PDF / Firma' },
+  ]
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-bg-card border border-bg-border w-full max-w-2xl h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(5px)' }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'rgba(5,7,10,0.97)', border: '1px solid rgba(201,168,76,0.2)', width: '100%', maxWidth: 760, height: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 28px 80px rgba(0,0,0,0.7), 0 0 50px rgba(201,168,76,0.04)' }}>
 
-        {/* ── Header ─────────────────────────────────────────── */}
-        <div className="px-5 py-4 border-b border-bg-border bg-bg-surface shrink-0">
+        {/* Header */}
+        <div style={{ borderBottom: '1px solid rgba(201,168,76,0.15)', padding: '14px 20px', background: 'rgba(8,11,15,0.6)', borderLeft: `3px solid ${item.estado === 'autorizado' ? 'var(--fib-green)' : item.estado === 'denegado' ? 'var(--fib-red)' : 'var(--fib-gold)'}` }}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="font-mono text-[10px] text-accent-blue bg-accent-blue/10 border border-accent-blue/30 px-2 py-0.5">{item.numeroSolicitud}</span>
-                <EstadoBadge estado={item.estado} />
-                <span className="font-mono text-[9px] text-tx-dim bg-bg-base border border-bg-border px-2 py-0.5">{item.unidad}</span>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="font-mono text-[10px]" style={{ color: 'var(--fib-gold)', fontFamily: 'Share Tech Mono, monospace' }}>{item.numeroSolicitud}</span>
+                <span className={`fib-record-badge ${ESTADO_STYLE[item.estado] || ''}`}>{item.estado}</span>
+                <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)' }}>{item.unidad}</span>
+                {item.casoVinculado && <span className="fib-record-badge fib-rb-caso" style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Link2 size={8} /> CASO VINCULADO</span>}
               </div>
-              <p className="font-display text-base font-semibold tracking-wider uppercase text-tx-primary leading-tight flex items-center gap-2">
-                <MapPin size={13} className="text-tx-muted shrink-0" />
-                {item.direccion}
-              </p>
-              <p className="font-mono text-[9px] text-tx-muted mt-1 flex items-center gap-1.5">
-                <Clock size={9} />
-                {item.nombreSolicitante}{item.callsignSolicitante && ` [${item.callsignSolicitante}]`}
-                <span className="text-tx-dim">·</span>
-                {new Date(item.fechaSolicitud).toLocaleDateString('es')}
+              <p className="text-sm font-bold tracking-wide uppercase" style={{ color: '#E8EEF5', fontFamily: 'Oswald, sans-serif' }}>{item.direccion}</p>
+              <p className="font-mono text-[9px] mt-0.5" style={{ color: 'var(--fib-text3)' }}>
+                {item.nombreSolicitante}{item.callsignSolicitante && ` [${item.callsignSolicitante}]`} · {fmtDate(item.fechaSolicitud)}
               </p>
             </div>
-            <button onClick={onClose} className="text-tx-muted hover:text-tx-primary shrink-0 p-1"><X size={15} /></button>
+            <button onClick={onClose} style={{ color: 'var(--fib-text3)' }}><X size={15} /></button>
           </div>
 
           {/* Supervisor actions */}
           {isSuperv && (
             <div className="flex gap-2 mt-3 flex-wrap">
               {item.estado === 'pendiente' && <>
-                <button onClick={() => doAction('autorizar')} disabled={sending} className="btn-success py-1.5 px-3 text-[9px]"><Check size={11} />Autorizar</button>
-                <button onClick={async () => { const m = await uiPrompt('Motivo de denegación:', { title: 'Denegar solicitud', placeholder: 'Escribe el motivo...' }); if (m) doAction('denegar', { motivo: m }) }} disabled={sending} className="btn-danger py-1.5 px-3 text-[9px]"><XCircle size={11} />Denegar</button>
+                <button onClick={() => doAction('autorizar')} disabled={sending} className="fib-add-btn flex items-center gap-1.5" style={{ borderRadius: 3, fontSize: 10 }}><Check size={11} />Autorizar</button>
+                <button onClick={async () => { const m = await uiPrompt('Motivo de denegación:', { title: 'Denegar', placeholder: 'Escribe el motivo...' }); if (m) doAction('denegar', { motivo: m }) }} disabled={sending} className="fib-action-btn" style={{ border: '1px solid rgba(192,57,43,0.5)', color: '#FF8B7A' }}><XCircle size={11} /> Denegar</button>
               </>}
-              {item.estado === 'autorizado' && (
-                <button onClick={() => doAction('ejecutar')} disabled={sending} className="btn-primary py-1.5 px-3 text-[9px]">⚡ Ejecutado</button>
-              )}
+              {item.estado === 'autorizado' && <button onClick={() => doAction('ejecutar')} disabled={sending} className="fib-add-btn" style={{ borderRadius: 3, fontSize: 10 }}>✅ Ejecutado</button>}
               {isCS && ['autorizado', 'ejecutado'].includes(item.estado) && (
-                <button onClick={async () => { if (!await uiConfirm('Esto quitará la autorización, reiniciará firmas y devolverá el estado a pendiente. ¿Continuar?', { title: 'Quitar autorización', tone: 'danger' })) return; await doAction('quitar_autorizacion') }} disabled={sending} className="btn-danger py-1.5 px-3 text-[9px]">
-                  <XCircle size={11} />Quitar autorización
-                </button>
+                <button onClick={async () => { if (!await uiConfirm('¿Quitar autorización y devolver a pendiente?', { title: 'Quitar autorización', tone: 'danger' })) return; doAction('quitar_autorizacion') }} disabled={sending} className="fib-action-btn" style={{ border: '1px solid rgba(192,57,43,0.4)', color: '#FF8B7A' }}><XCircle size={11} /> Quitar autorizacion</button>
               )}
-              {!yafirmo && item.estado !== 'denegado' && (
-                <button onClick={() => doAction('firmar', { tipoFirma: 'supervisor' })} disabled={sending} className="btn-ghost py-1.5 px-3 text-[9px]"><PenTool size={11} />Firmar</button>
-              )}
+              {!yafirmo && item.estado !== 'denegado' && <button onClick={() => doAction('firmar', { tipoFirma: 'supervisor' })} disabled={sending} className="fib-action-btn"><PenTool size={11} /> Firmar</button>}
             </div>
           )}
           {isCS && (
-            <div className="flex gap-2 mt-2 flex-wrap">
-              <button onClick={async () => { if (!await uiConfirm('¿Eliminar esta solicitud de allanamiento? Esta acción no se puede deshacer.', { tone: 'danger', title: 'Eliminar solicitud' })) return; setSending(true); try { await borrarAllanamiento(itemId); onAction('Solicitud eliminada'); onClose() } catch (e: any) { uiAlert(e?.message || 'No se pudo eliminar la solicitud', 'Allanamientos') } finally { setSending(false) } }} disabled={sending} className="btn-danger py-1.5 px-3 text-[9px]">
-                <Trash2 size={11} />Eliminar solicitud
-              </button>
+            <div className="flex gap-2 mt-2">
+              <button onClick={async () => { if (!await uiConfirm('¿Eliminar esta solicitud? No se puede deshacer.', { tone: 'danger', title: 'Eliminar' })) return; setSending(true); try { await borrarAllanamiento(itemId); onAction('Solicitud eliminada'); onClose() } catch (e: any) { uiAlert(e?.message || 'Error', 'Allanamientos') } finally { setSending(false) } }} disabled={sending} className="fib-action-btn" style={{ border: '1px solid rgba(192,57,43,0.35)', color: '#FF8B7A' }}><Trash2 size={11} /> Eliminar solicitud</button>
             </div>
           )}
         </div>
 
-        {/* ── Tabs ─────────────────────────────────────────────── */}
-        <div className="flex border-b border-bg-border shrink-0 bg-bg-base">
-          {[{ id: 'info', l: 'Expediente' }, { id: 'chat', l: `Chat ${item.mensajes?.length > 0 ? `(${item.mensajes.length})` : ''}` }, { id: 'pdf', l: 'PDF / Firma' }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as any)}
-              className={`px-5 py-2.5 font-mono text-[9px] tracking-widest uppercase transition-all border-b-2 -mb-px ${tab === t.id ? 'border-accent-blue text-accent-blue bg-accent-blue/5' : 'border-transparent text-tx-muted hover:text-tx-secondary hover:bg-bg-hover/40'}`}>
-              {t.l}
+        {/* Tabs */}
+        <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--fib-border)', background: 'rgba(8,11,15,0.5)' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className="px-4 py-3 font-mono text-[9px] tracking-widest uppercase whitespace-nowrap transition-all"
+              style={{ borderBottom: `2px solid ${tab === t.id ? 'var(--fib-gold)' : 'transparent'}`, color: tab === t.id ? 'var(--fib-gold)' : 'var(--fib-text3)', background: tab === t.id ? 'rgba(201,168,76,0.05)' : 'transparent', marginBottom: -1 }}>
+              {t.label}
             </button>
           ))}
         </div>
 
-        {/* ── INFO TAB ─────────────────────────────────────────── */}
-        {tab === 'info' && (
-          <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
-            {isCS && (
-              <div className="bg-bg-surface border border-accent-blue/20 p-4 flex flex-col gap-3">
-                <p className="font-mono text-[9px] text-accent-blue uppercase tracking-widest flex items-center gap-1"><Pencil size={9} /> Editar (Command Staff)</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="label">N° Solicitud</label><input className="input text-xs py-2" value={editForm.numeroSolicitud} onChange={e => setEditForm(p => ({ ...p, numeroSolicitud: e.target.value }))} /></div>
-                  <div><label className="label">Unidad</label><input className="input text-xs py-2" value={editForm.unidad} onChange={e => setEditForm(p => ({ ...p, unidad: e.target.value }))} /></div>
-                </div>
-                <div><label className="label">Dirección</label><input className="input text-xs py-2" value={editForm.direccion} onChange={e => setEditForm(p => ({ ...p, direccion: e.target.value }))} /></div>
-                <div><label className="label">Sospechoso</label><input className="input text-xs py-2" value={editForm.sospechoso} onChange={e => setEditForm(p => ({ ...p, sospechoso: e.target.value }))} /></div>
-                <div><label className="label">Motivación</label><textarea className="input min-h-20 resize-none text-xs" value={editForm.motivacion} onChange={e => setEditForm(p => ({ ...p, motivacion: e.target.value }))} /></div>
-                <div><label className="label">Descripción</label><textarea className="input min-h-16 resize-none text-xs" value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))} /></div>
-                <div><label className="label">Observaciones</label><textarea className="input min-h-16 resize-none text-xs" value={editForm.observaciones} onChange={e => setEditForm(p => ({ ...p, observaciones: e.target.value }))} /></div>
-                <button onClick={async () => { setSending(true); try { await editarAllanamiento(itemId, { accion: 'editar', ...editForm }); await load(); onAction('Solicitud actualizada') } catch (e: any) { uiAlert(e?.message || 'No se pudo actualizar la solicitud', 'Allanamientos') } finally { setSending(false) } }} disabled={sending} className="btn-primary w-fit py-2 px-3 text-[10px]">
-                  <Pencil size={12} />Guardar cambios
-                </button>
-              </div>
-            )}
+        {/* Content */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-            {/* Info cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[['Sospechoso', item.sospechoso || '—'], ['Unidad', item.unidad], ['Solicitante', `${item.nombreSolicitante}${item.callsignSolicitante ? ` [${item.callsignSolicitante}]` : ''}`]].map(([k, v]) => (
-                <div key={k} className="bg-bg-surface border border-bg-border p-3">
-                  <p className="font-mono text-[8px] text-tx-dim uppercase mb-1">{k}</p>
-                  <p className="text-xs text-tx-primary font-medium">{v}</p>
+          {/* INFO */}
+          {tab === 'info' && (
+            <div style={{ height: '100%', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {isCS && (
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header">// editar solicitud (command staff)</div>
+                  <div className="fib-panel-card-body flex flex-col gap-2">
+                    <div className="fib-form-grid">
+                      <div><label className="fib-form-label">N° Solicitud</label><input className="fib-form-ctrl" value={editForm.numeroSolicitud} onChange={e => setEditForm(p => ({ ...p, numeroSolicitud: e.target.value }))} /></div>
+                      <div><label className="fib-form-label">Unidad</label><input className="fib-form-ctrl" value={editForm.unidad} onChange={e => setEditForm(p => ({ ...p, unidad: e.target.value }))} /></div>
+                    </div>
+                    <div><label className="fib-form-label">Dirección</label><input className="fib-form-ctrl w-full" value={editForm.direccion} onChange={e => setEditForm(p => ({ ...p, direccion: e.target.value }))} /></div>
+                    <div><label className="fib-form-label">Sospechoso</label><input className="fib-form-ctrl w-full" value={editForm.sospechoso} onChange={e => setEditForm(p => ({ ...p, sospechoso: e.target.value }))} /></div>
+                    <div><label className="fib-form-label">Motivación</label><textarea className="fib-form-ctrl w-full" value={editForm.motivacion} onChange={e => setEditForm(p => ({ ...p, motivacion: e.target.value }))} /></div>
+                    <div><label className="fib-form-label">Observaciones</label><textarea className="fib-form-ctrl w-full" style={{ minHeight: 60 }} value={editForm.observaciones} onChange={e => setEditForm(p => ({ ...p, observaciones: e.target.value }))} /></div>
+                    <button onClick={async () => { setSending(true); try { await editarAllanamiento(itemId, { accion: 'editar', ...editForm }); await load(); onAction('Solicitud actualizada') } catch (e: any) { uiAlert(e?.message || 'Error', 'Allanamientos') } finally { setSending(false) } }} disabled={sending} className="fib-add-btn w-fit flex items-center gap-1.5" style={{ borderRadius: 3, fontSize: 10 }}><Pencil size={11} />Guardar cambios</button>
+                  </div>
+                </div>
+              )}
+              {[
+                ['Sospechoso', item.sospechoso || '—'],
+                ['Unidad', item.unidad],
+                ['Solicitante', `${item.nombreSolicitante}${item.callsignSolicitante ? ` [${item.callsignSolicitante}]` : ''}`],
+              ].map(([k, v]) => (
+                <div key={k} className="fib-entry-item">
+                  <p className="fib-entry-date">{k}</p>
+                  <p style={{ fontSize: 13, color: 'var(--fib-text)' }}>{v}</p>
                 </div>
               ))}
-            </div>
-
-            <div className="bg-bg-surface border border-bg-border p-4">
-              <p className="font-mono text-[8px] text-tx-dim uppercase mb-2 flex items-center gap-1"><AlertTriangle size={8} /> Motivación legal</p>
-              <p className="text-xs text-tx-primary leading-relaxed whitespace-pre-wrap">{item.motivacion}</p>
-            </div>
-
-            {item.descripcion && (
-              <div className="bg-bg-surface border border-bg-border p-4">
-                <p className="font-mono text-[8px] text-tx-dim uppercase mb-2">Descripción del operativo</p>
-                <p className="text-xs text-tx-secondary leading-relaxed">{item.descripcion}</p>
+              <div className="fib-entry-item">
+                <p className="fib-entry-date">Motivación</p>
+                <p style={{ fontSize: 12, color: 'var(--fib-text2)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginTop: 4 }}>{item.motivacion}</p>
               </div>
-            )}
-
-            {item.observaciones && (
-              <div className="bg-bg-surface border border-bg-border p-4">
-                <p className="font-mono text-[8px] text-tx-dim uppercase mb-2">Observaciones</p>
-                <p className="text-xs text-tx-secondary leading-relaxed">{item.observaciones}</p>
-              </div>
-            )}
-
-            {item.motivoDenegacion && (
-              <div className="bg-red-900/10 border border-red-800/40 p-4">
-                <p className="font-mono text-[8px] text-red-500 uppercase mb-2 flex items-center gap-1"><XCircle size={9} /> Motivo de denegación</p>
-                <p className="text-xs text-red-300 leading-relaxed">{item.motivoDenegacion}</p>
-              </div>
-            )}
-
-            {item.firmas?.length > 0 && (
-              <div className="bg-green-900/10 border border-green-800/40 p-4">
-                <p className="font-mono text-[8px] text-green-500 uppercase mb-3 flex items-center gap-1"><PenTool size={9} /> Firmas registradas</p>
-                <div className="flex flex-col gap-2">
+              {item.descripcion && <div className="fib-entry-item"><p className="fib-entry-date">Descripción</p><p style={{ fontSize: 12, color: 'var(--fib-text2)', marginTop: 4 }}>{item.descripcion}</p></div>}
+              {item.motivoDenegacion && <div className="fib-entry-item" style={{ borderLeftColor: 'var(--fib-red)' }}><p className="fib-entry-date" style={{ color: 'var(--fib-red2)' }}>Motivo de denegación</p><p style={{ fontSize: 12, color: '#FF8B7A', marginTop: 4 }}>{item.motivoDenegacion}</p></div>}
+              {item.firmas?.length > 0 && (
+                <div className="fib-entry-item" style={{ borderLeftColor: 'var(--fib-green)' }}>
+                  <p className="fib-entry-date" style={{ color: 'var(--fib-green)' }}>Firmas ({item.firmas.length})</p>
                   {item.firmas.map((f: any, i: number) => (
-                    <div key={i} className="flex items-center gap-3 py-1.5 border-b border-green-900/20 last:border-0">
-                      <div className="w-7 h-7 flex items-center justify-center bg-green-900/30 border border-green-800/40 font-display text-[10px] font-bold text-green-400 uppercase">
-                        {f.nombre?.[0]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-green-300 font-medium">{f.nombre}{f.callsign && ` [${f.callsign}]`}</p>
-                        <p className="font-mono text-[8px] text-green-600">{f.rol?.replace('_', ' ')}</p>
-                      </div>
-                      <span className="font-mono text-[8px] text-green-700">{new Date(f.fecha).toLocaleDateString('es')}</span>
+                    <div key={i} className="flex items-center gap-2 mt-1.5">
+                      <PenTool size={10} style={{ color: 'var(--fib-green)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: '#7FD49D' }}>{f.nombre}{f.callsign && ` [${f.callsign}]`}</span>
+                      <span className="font-mono text-[8px] ml-auto" style={{ color: 'var(--fib-text4)' }}>{f.rol?.replace('_', ' ')} · {fmtDate(f.fecha)}</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── CHAT TAB ────────────────────────────────────────── */}
-        {tab === 'chat' && (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div ref={scrollRef} onScroll={onChatScroll} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2">
-              {grouped.map((group: any, gi: number) => {
-                // System / action messages
-                if (group.tipo === 'sistema' || group.tipo === 'accion') {
-                  return (
-                    <div key={`${group.id}-${gi}`} className="flex justify-center">
-                      <span className="font-mono text-[8px] text-tx-dim italic px-3 py-1 bg-bg-surface border border-bg-border/50">
-                        {group.msgs[0].contenido}
-                      </span>
-                    </div>
-                  )
-                }
-                // Document generated
-                if (group.tipo === 'documento') {
-                  return (
-                    <div key={`${group.id}-${gi}`} className="border border-accent-blue/30 bg-accent-blue/5 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText size={13} className="text-accent-blue" />
-                        <p className="font-mono text-[9px] uppercase tracking-widest text-accent-blue">Documento de Allanamiento</p>
-                      </div>
-                      <p className="text-xs text-tx-secondary mb-3">{group.msgs[0].contenido}</p>
-                      {group.msgs[0].htmlSnapshot && (
-                        <a href={group.msgs[0].htmlSnapshot} target="_blank" rel="noreferrer" className="block border border-bg-border hover:opacity-90 transition-opacity overflow-hidden">
-                          <img src={group.msgs[0].htmlSnapshot} alt="Vista previa" className="w-full max-h-56 object-cover" />
-                        </a>
-                      )}
-                      <p className="font-mono text-[8px] text-tx-dim mt-2">{new Date(group.fecha).toLocaleString('es')}</p>
-                    </div>
-                  )
-                }
-                // Evidence / informe de hallazgo
-                if (group.tipo === 'informe') {
-                  const imgUrl = extractImageUrl(group.msgs[0].contenido)
-                  return (
-                    <div key={`${group.id}-${gi}`} className="border border-cyan-800/50 bg-cyan-900/8 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Camera size={13} className="text-cyan-400" />
-                        <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-400">Informe de Hallazgo</p>
-                      </div>
-                      <p className="text-xs text-tx-primary whitespace-pre-wrap leading-relaxed mb-2">{group.msgs[0].contenido}</p>
-                      {imgUrl && (
-                        <a href={imgUrl} target="_blank" rel="noreferrer" className="block border border-cyan-800/40 mt-2 overflow-hidden hover:opacity-90 transition-opacity">
-                          <img src={imgUrl} alt="Evidencia" className="w-full max-h-72 object-contain bg-black/30" />
-                          <div className="px-2 py-1 bg-cyan-900/20 border-t border-cyan-800/30">
-                            <p className="font-mono text-[8px] text-cyan-600">🔍 Click para ampliar</p>
-                          </div>
-                        </a>
-                      )}
-                      <p className="font-mono text-[8px] text-tx-dim mt-2">{group.msgs[0].nombre} · {new Date(group.fecha).toLocaleString('es')}</p>
-                    </div>
-                  )
-                }
-                // Regular chat message group
-                const isOwn = group.autor === user?.username
-                const accentCol = ({ command_staff: '#ef4444', supervisory: '#1B6FFF', federal_agent: '#2ECC71', visitante: '#8799AE' } as any)[group.rol] || '#8799AE'
-                return (
-                  <div key={`${group.id}-${gi}`} className="flex gap-2.5 group">
-                    <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-0.5 font-display text-[11px] font-bold uppercase border"
-                      style={{ backgroundColor: `${accentCol}15`, borderColor: `${accentCol}35`, color: accentCol }}>
-                      {group.nombre?.[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 mb-0.5">
-                        <span className="font-display text-[11px] font-semibold tracking-wider uppercase" style={{ color: accentCol }}>{group.nombre}</span>
-                        {group.callsign && <span className="font-mono text-[8px] text-tx-dim border border-bg-border px-1">[{group.callsign}]</span>}
-                        <span className="font-mono text-[8px] text-tx-dim opacity-0 group-hover:opacity-100 transition-opacity">
-                          {new Date(group.fecha).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        {group.msgs.map((m: any) => (
-                          <p key={m.id} className="text-sm text-tx-secondary leading-relaxed break-words">{m.contenido}</p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              <div ref={bottomRef} />
+              )}
             </div>
+          )}
 
-            {canChat && (
-              <div className="px-4 py-3 border-t border-bg-border shrink-0 flex flex-col gap-3 bg-bg-card">
-                {/* Regular message */}
-                <form onSubmit={enviarMensajeChat} className="flex gap-2">
-                  <input className="input flex-1 text-sm py-2.5" value={mensaje} onChange={e => setMensaje(e.target.value)} placeholder="Escribe un mensaje..." disabled={sending} />
-                  <button type="submit" disabled={sending || !mensaje.trim()} className="btn-primary py-2 px-3 disabled:opacity-30"><Send size={13} /></button>
-                </form>
-                {/* Evidence report */}
-                <form onSubmit={enviarReporteHallazgo} className="border border-cyan-800/30 bg-cyan-900/5 p-3 flex flex-col gap-2">
-                  <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-400 flex items-center gap-1.5">
-                    <Camera size={10} /> Informe de captura / hallazgo
-                  </p>
-                  <input className="input text-xs py-2" value={hallazgo} onChange={e => setHallazgo(e.target.value)} placeholder="¿Qué se encontró? (armas, dinero, documentos...)" disabled={sending} />
-                  <input className="input text-xs py-2" value={propiedad} onChange={e => setPropiedad(e.target.value)} placeholder="Propiedad o ubicación asociada" disabled={sending} />
-                  <div className="flex gap-2 items-center">
-                    <input className="input text-xs py-2 flex-1" value={evidenciaUrl} onChange={e => setEvidenciaUrl(e.target.value)} placeholder="URL de evidencia fotográfica (opcional)" disabled={sending} />
-                    <button type="submit" disabled={sending || !hallazgo.trim() || !propiedad.trim()} className="btn-ghost py-2 px-3 text-[10px] whitespace-nowrap disabled:opacity-30">
-                      Registrar
-                    </button>
-                  </div>
-                  {evidenciaUrl && extractImageUrl(evidenciaUrl) && (
-                    <div className="border border-cyan-800/30 overflow-hidden">
-                      <img src={extractImageUrl(evidenciaUrl)} alt="Preview" className="w-full max-h-32 object-contain bg-black/20" onError={e => (e.target as any).style.display = 'none'} />
+          {/* CHAT */}
+          {tab === 'chat' && (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div ref={scrollRef} onScroll={onChatScroll} style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(item.mensajes || []).map((m: any) => {
+                  if (m.tipo === 'sistema' || m.tipo === 'accion') return (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: 'center' }}>
+                      <div className="font-mono text-[8px] italic py-1 px-3" style={{ background: 'rgba(8,11,15,0.7)', border: '1px solid var(--fib-border)', color: 'var(--fib-text4)' }}>
+                        {m.contenido} · <span style={{ color: 'var(--fib-text4)' }}>{fmtDT(m.fecha)}</span>
+                      </div>
                     </div>
-                  )}
-                </form>
+                  )
+                  if (m.tipo === 'documento') return (
+                    <div key={m.id} style={{ border: '1px solid rgba(36,96,200,0.35)', background: 'rgba(36,96,200,0.07)', padding: 12 }}>
+                      <p className="font-mono text-[8px] uppercase tracking-widest mb-1" style={{ color: '#7AABFF' }}>Documento de Allanamiento</p>
+                      <p style={{ fontSize: 12, color: 'var(--fib-text2)', marginBottom: 8 }}>{m.contenido}</p>
+                      {m.htmlSnapshot && <a href={m.htmlSnapshot} target="_blank" rel="noreferrer" style={{ display: 'block', border: '1px solid var(--fib-border)' }}><img src={m.htmlSnapshot} alt="Preview" style={{ width: '100%', maxHeight: 200, objectFit: 'cover' }} /></a>}
+                      <p className="font-mono text-[8px] mt-2" style={{ color: 'var(--fib-text4)' }}>{fmtDT(m.fecha)}</p>
+                    </div>
+                  )
+                  if (m.tipo === 'informe') {
+                    const imgUrl = extractImgFromText(m.contenido)
+                    const normalizedImg = imgUrl ? normalizeImgUrl(imgUrl) : ''
+                    return (
+                      <div key={m.id} style={{ border: '1px solid rgba(26,188,156,0.3)', background: 'rgba(26,188,156,0.06)', padding: 12 }}>
+                        <p className="font-mono text-[8px] uppercase tracking-widest mb-1" style={{ color: 'var(--fib-cyan)' }}>Informe de Hallazgo</p>
+                        <p style={{ fontSize: 12, color: 'var(--fib-text)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{m.contenido}</p>
+                        {normalizedImg && isImgUrl(normalizedImg) && (
+                          <a href={normalizedImg} target="_blank" rel="noreferrer" style={{ display: 'block', marginTop: 8, border: '1px solid rgba(26,188,156,0.25)' }}>
+                            <img src={normalizedImg} alt="Evidencia" style={{ width: '100%', maxHeight: 240, objectFit: 'contain', background: 'rgba(0,0,0,0.3)' }} />
+                          </a>
+                        )}
+                        <p className="font-mono text-[8px] mt-2" style={{ color: 'var(--fib-text4)' }}>{m.nombre} · {fmtDT(m.fecha)}</p>
+                      </div>
+                    )
+                  }
+                  // Normal message
+                  const isMe = m.autor === user?.username
+                  return (
+                    <div key={m.id} style={{ display: 'flex', gap: 8, flexDirection: isMe ? 'row-reverse' : 'row' }}>
+                      <div style={{ width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, fontFamily: 'Oswald, sans-serif', marginTop: 2, background: isMe ? 'rgba(201,168,76,0.15)' : 'rgba(26,37,52,0.6)', border: `1px solid ${isMe ? 'var(--fib-gold-dim)' : 'var(--fib-border)'}`, color: isMe ? 'var(--fib-gold)' : 'var(--fib-text3)' }}>{m.nombre?.[0]}</div>
+                      <div style={{ maxWidth: '78%', display: 'flex', flexDirection: 'column', gap: 2, alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexDirection: isMe ? 'row-reverse' : 'row' }}>
+                          <span className="font-mono text-[9px]" style={{ color: isMe ? 'var(--fib-gold-dim)' : 'var(--fib-text3)' }}>{m.nombre}</span>
+                          <span className="font-mono text-[8px]" style={{ color: 'var(--fib-text4)' }}>{fmtDT(m.fecha)}</span>
+                        </div>
+                        <div className={`fib-msg ${isMe ? 'me' : 'them'}`}>{m.contenido}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={bottomRef} />
               </div>
-            )}
-            {!canChat && (
-              <div className="px-4 py-3 border-t border-bg-border bg-bg-card">
-                <p className="font-mono text-[9px] text-tx-muted text-center uppercase">Solo puedes leer este chat</p>
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* ── PDF TAB ──────────────────────────────────────────── */}
-        {tab === 'pdf' && (
-          <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
-            <div className="card p-5">
-              <p className="section-tag mb-1">// Documento Oficial</p>
-              <p className="font-display text-sm font-semibold uppercase tracking-wider text-tx-primary mb-3">Descargar PDF</p>
-              <p className="text-xs text-tx-secondary mb-4 leading-relaxed">Incluye todos los datos de la solicitud, observaciones y las firmas registradas.</p>
-              <button onClick={descargarPDF} disabled={sending} className="btn-primary"><FileText size={12} />Descargar PDF oficial</button>
+              {canChat && (
+                <div style={{ padding: 12, borderTop: '1px solid var(--fib-border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <form onSubmit={enviarMsg} style={{ display: 'flex', gap: 8 }}>
+                    <input className="fib-chat-inp" value={mensaje} onChange={e => setMensaje(e.target.value)} placeholder="Escribe un mensaje..." disabled={sending} />
+                    <button type="submit" disabled={sending || !mensaje.trim()} className="fib-send-btn"><Send size={13} /></button>
+                  </form>
+                  <form onSubmit={registrarHallazgo} style={{ border: '1px solid rgba(26,188,156,0.25)', background: 'rgba(26,188,156,0.04)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <p className="font-mono text-[8px] uppercase tracking-widest" style={{ color: 'var(--fib-cyan)' }}>// Informe de captura / hallazgo</p>
+                    <input className="fib-form-ctrl" style={{ fontSize: 12 }} value={hallazgo} onChange={e => setHallazgo(e.target.value)} placeholder="¿Qué se encontró? (armas, dinero, documentos...)" disabled={sending} />
+                    <input className="fib-form-ctrl" style={{ fontSize: 12 }} value={propiedad} onChange={e => setPropiedad(e.target.value)} placeholder="Propiedad o ubicación" disabled={sending} />
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="fib-form-label" style={{ margin: 0 }}>Links evidencia (Imgur / imagen)</label>
+                        {evidLinks.length < 8 && <button type="button" onClick={() => setEvidLinks(p => [...p, ''])} className="fib-action-btn" style={{ padding: '2px 8px', fontSize: 9 }}>+ URL</button>}
+                      </div>
+                      {evidLinks.map((l, i) => (
+                        <div key={i} className="flex items-center gap-2 mb-1">
+                          <input className="fib-form-ctrl flex-1" style={{ fontSize: 11 }} placeholder="https://i.imgur.com/..." value={l} onChange={e => setEvidLinks(p => { const n = [...p]; n[i] = e.target.value; return n })} />
+                          {l && isImgUrl(l) && <img src={normalizeImgUrl(l)} alt="" style={{ width: 28, height: 28, objectFit: 'cover', border: '1px solid var(--fib-border)', flexShrink: 0 }} />}
+                          {evidLinks.length > 1 && <button type="button" onClick={() => setEvidLinks(p => p.filter((_, j) => j !== i))} style={{ color: 'var(--fib-red2)', flexShrink: 0 }}><X size={13} /></button>}
+                        </div>
+                      ))}
+                    </div>
+                    <button type="submit" disabled={sending || !hallazgo.trim() || !propiedad.trim()} className="fib-action-btn" style={{ fontSize: 10, padding: '6px 14px' }}>{sending ? 'Registrando...' : 'REGISTRAR INFORME'}</button>
+                  </form>
+                </div>
+              )}
+              {!canChat && <div style={{ padding: 12, borderTop: '1px solid var(--fib-border)' }}><p className="font-mono text-[9px] text-center uppercase" style={{ color: 'var(--fib-text4)' }}>Solo lectura</p></div>}
             </div>
-            {isSuperv && !yafirmo && item.estado !== 'denegado' && (
-              <div className="card p-5">
-                <p className="section-tag mb-1">// Firma Digital</p>
-                <p className="font-display text-sm font-semibold uppercase tracking-wider text-tx-primary mb-3">Firmar Documento</p>
-                <p className="text-xs text-tx-secondary mb-4">Tu firma quedará registrada y aparecerá en el PDF oficial.</p>
-                <button onClick={() => doAction('firmar', { tipoFirma: 'supervisor' })} disabled={sending} className="btn-success">
-                  <PenTool size={12} />Firmar como {user?.rol?.replace('_', ' ')}
-                </button>
+          )}
+
+          {/* ÁLBUM */}
+          {tab === 'album' && (
+            <div style={{ height: '100%', overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="flex items-center justify-between">
+                <div className="fib-section-label" style={{ margin: 0 }}>// álbum de evidencia fotográfica</div>
+                <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)' }}>{album.length}/20 fotos</span>
               </div>
-            )}
-            {yafirmo && (
-              <div className="card p-4 border-green-800/40 bg-green-900/10">
-                <p className="font-mono text-xs text-green-400 flex items-center gap-2"><CheckCircle size={13} /> Ya has firmado este documento</p>
+
+              {album.length === 0 && (
+                <div className="fib-panel-card p-10 text-center" style={{ opacity: 0.4 }}>
+                  <Camera size={28} className="mx-auto mb-2" />
+                  <p className="font-mono text-xs">Sin fotos en el álbum</p>
+                </div>
+              )}
+
+              {album.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  {album.map((url: string, i: number) => {
+                    const normalized = normalizeImgUrl(url)
+                    const isImg = isImgUrl(url)
+                    return isImg ? (
+                      <a key={i} href={normalized} target="_blank" rel="noreferrer" style={{ display: 'block', border: '1px solid var(--fib-border)', overflow: 'hidden', position: 'relative' }}>
+                        <img src={normalized} alt={`Foto ${i + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', background: '#000', display: 'block' }}
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '4px 6px', background: 'rgba(0,0,0,0.6)', fontFamily: 'Share Tech Mono, monospace', fontSize: 8, color: 'var(--fib-text4)' }}>
+                          FOTO {i + 1}
+                        </div>
+                      </a>
+                    ) : (
+                      <a key={i} href={url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 8, border: '1px solid var(--fib-border)', fontFamily: 'Share Tech Mono, monospace', fontSize: 9, color: '#7AABFF', wordBreak: 'break-all' }}>
+                        <ExternalLink size={9} style={{ flexShrink: 0 }} />{url.slice(0, 30)}...
+                      </a>
+                    )
+                  })}
+                </div>
+              )}
+
+              {(isSuperv || item.solicitadoPor === user?.username) && album.length < 20 && (
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header">// añadir foto al álbum</div>
+                  <div className="fib-panel-card-body">
+                    <AddFotoForm onAdd={addFotoToAlbum} saving={sending} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PDF */}
+          {tab === 'pdf' && (
+            <div style={{ height: '100%', overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="fib-panel-card">
+                <div className="fib-panel-card-header">// descargar documento oficial</div>
+                <div className="fib-panel-card-body flex flex-col gap-3">
+                  <p style={{ fontSize: 12, color: 'var(--fib-text2)', lineHeight: 1.6 }}>Descarga el PDF oficial con todos los datos, observaciones y firmas registradas.</p>
+                  <button onClick={descargarPDF} disabled={sending} className="fib-add-btn w-fit flex items-center gap-1.5" style={{ borderRadius: 3, fontSize: 11 }}><FileText size={12} />Descargar PDF</button>
+                </div>
               </div>
-            )}
-            {!isSuperv && (
-              <div className="card p-4">
-                <p className="font-mono text-xs text-tx-muted">Las firmas solo pueden ser realizadas por Supervisory y Command Staff.</p>
-              </div>
-            )}
-          </div>
-        )}
+              {isSuperv && !yafirmo && item.estado !== 'denegado' && (
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header">// firmar documento</div>
+                  <div className="fib-panel-card-body flex flex-col gap-2">
+                    <p style={{ fontSize: 12, color: 'var(--fib-text2)' }}>Tu firma quedará registrada en el PDF.</p>
+                    <button onClick={() => doAction('firmar', { tipoFirma: 'supervisor' })} disabled={sending} className="fib-add-btn w-fit flex items-center gap-1.5" style={{ borderRadius: 3, fontSize: 11 }}><PenTool size={12} />Firmar como {user?.rol?.replace('_', ' ')}</button>
+                  </div>
+                </div>
+              )}
+              {yafirmo && <div className="fib-entry-item" style={{ borderLeftColor: 'var(--fib-green)' }}><p style={{ fontSize: 12, color: '#7FD49D' }}>✅ Ya has firmado este documento.</p></div>}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
+function AddFotoForm({ onAdd, saving }: { onAdd: (url: string) => void; saving: boolean }) {
+  const [url, setUrl] = useState('')
+  const normalized = normalizeImgUrl(url)
+  const preview = url && isImgUrl(url)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <input className="fib-form-ctrl" placeholder="https://i.imgur.com/... o URL de imagen directa" value={url} onChange={e => setUrl(e.target.value)} />
+      {preview && <img src={normalized} alt="Preview" style={{ maxHeight: 120, objectFit: 'contain', border: '1px solid var(--fib-border)', background: 'rgba(0,0,0,0.3)' }} onError={e => (e.target as HTMLImageElement).style.display = 'none'} />}
+      <button onClick={() => { onAdd(url); setUrl('') }} disabled={saving || !url.trim()} className="fib-add-btn w-fit" style={{ borderRadius: 3, fontSize: 10 }}>AÑADIR AL ÁLBUM</button>
+    </div>
+  )
+}
+
+/* ── Main page ─────────────────────────────────────────────────── */
 export default function AllanamientosPage() {
   const [user, setUser] = useState<any>(null)
   const [items, setItems] = useState<any[]>([])
@@ -502,6 +575,7 @@ export default function AllanamientosPage() {
   const [viewId, setViewId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [filtro, setFiltro] = useState('activos')
+  const clock = useUtcClock()
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -524,83 +598,96 @@ export default function AllanamientosPage() {
   const pendientes = items.filter(i => i.estado === 'pendiente').length
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="fib-panel-container">
       {toast && <Toast msg={toast.msg} ok={toast.ok} onClose={() => setToast(null)} />}
-      {showCreate && <ModalCrear onClose={() => setShowCreate(false)} onSuccess={m => notify(m)} />}
+      {showCreate && user && <ModalCrear user={user} onClose={() => setShowCreate(false)} onSuccess={m => notify(m)} />}
       {viewId && <ModalAllanamiento itemId={viewId} user={user} onClose={() => setViewId(null)} onAction={m => notify(m)} />}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="page-header mb-0">
-          <span className="section-tag">// Allanamientos</span>
-          <h1 className="font-display text-xl font-semibold tracking-wider uppercase text-tx-primary mt-0.5 flex items-center gap-3">
-            Solicitudes
-            {pendientes > 0 && (
-              <span className="font-mono text-[9px] bg-yellow-900/30 border border-yellow-700 text-yellow-400 px-2 py-0.5 flex items-center gap-1">
-                <Clock size={9} /> {pendientes} pendiente{pendientes > 1 ? 's' : ''}
-              </span>
-            )}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={load} className="btn-ghost py-2 px-3" title="Actualizar"><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /></button>
-          <button onClick={() => setShowCreate(true)} className="btn-primary py-2"><Plus size={12} />Nueva Solicitud</button>
+      {/* Topbar */}
+      <div className="fib-topbar">
+        <span className="fib-logo">FIB</span>
+        <span className="fib-topbar-sep">|</span>
+        <span className="fib-topbar-label">ALLANAMIENTOS</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)', fontFamily: 'Share Tech Mono, monospace' }}>{clock}</span>
+          <button className="fib-sync-btn" onClick={load} style={{ marginLeft: 0 }}>↻ ACTUALIZAR</button>
+          <button onClick={() => setShowCreate(true)} className="fib-add-btn" style={{ borderRadius: 3, fontSize: 10 }}>+ NUEVA SOLICITUD</button>
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-4">
-        <select className="input py-2 text-xs w-auto" value={filtro} onChange={e => setFiltro(e.target.value)}>
-          <option value="activos">Activos (pendiente / autorizado)</option>
-          <option value="todos">Todos los estados</option>
-          {['pendiente', 'autorizado', 'denegado', 'ejecutado'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-        </select>
-      </div>
+      <div className="fib-main">
+        <div className="fib-section-label">// solicitudes de allanamiento</div>
 
-      {/* Table */}
-      {loading
-        ? <div className="text-center py-12 font-mono text-xs text-tx-muted">Cargando…</div>
-        : items.length === 0
-          ? (
-            <div className="card p-14 flex flex-col items-center gap-3 text-tx-muted">
-              <Shield size={28} className="opacity-20" />
-              <p className="font-mono text-xs tracking-widest uppercase">Sin solicitudes</p>
-            </div>
-          )
-          : (
-            <div className="card overflow-x-auto">
-              <table className="w-full">
+        {/* Stats */}
+        <div className="fib-agent-header" style={{ padding: '14px 20px', marginBottom: 18 }}>
+          <div style={{ flex: 1 }}>
+            <div className="fib-agent-main-name" style={{ fontSize: 15 }}>Solicitudes de Allanamiento</div>
+            <div className="fib-agent-callsign">Sistema de Gestión Operativa</div>
+          </div>
+          <div className="fib-agent-stats">
+            {[
+              ['Pendientes', items.filter(i => i.estado === 'pendiente').length, 'var(--fib-amber)'],
+              ['Autorizados', items.filter(i => i.estado === 'autorizado').length, 'var(--fib-green)'],
+              ['Ejecutados', items.filter(i => i.estado === 'ejecutado').length, '#7AABFF'],
+              ['Denegados', items.filter(i => i.estado === 'denegado').length, 'var(--fib-red2)'],
+            ].map(([l, n, c]) => (
+              <div key={l as string} className="fib-stat-box">
+                <div className="fib-stat-num" style={{ color: c as string, fontSize: 18 }}>{n as number}</div>
+                <div className="fib-stat-lbl">{l as string}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <select className="fib-form-ctrl" style={{ width: 'auto', padding: '7px 12px' }} value={filtro} onChange={e => setFiltro(e.target.value)}>
+            <option value="activos">Activos (pendiente/autorizado)</option>
+            <option value="todos">Todos los estados</option>
+            {['pendiente', 'autorizado', 'denegado', 'ejecutado'].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button onClick={load} className="fib-action-btn py-2 px-3"><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /></button>
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div className="fib-panel-card p-10 text-center"><p className="fib-section-label" style={{ margin: 0 }}>cargando solicitudes...</p></div>
+        ) : items.length === 0 ? (
+          <div className="fib-panel-card p-14 text-center" style={{ opacity: 0.4 }}>
+            <Shield size={32} className="mx-auto mb-3" style={{ color: 'var(--fib-gold)' }} />
+            <p className="font-mono text-xs tracking-widest uppercase">Sin solicitudes</p>
+          </div>
+        ) : (
+          <div className="fib-panel-card" style={{ overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="fib-records-table" style={{ minWidth: 720 }}>
                 <thead>
-                  <tr className="border-b border-bg-border bg-bg-surface">
-                    {['N°', 'Dirección', 'Sospechoso', 'Estado', 'Unidad', 'Solicitante', 'Firmas', 'Fecha', ''].map(h => (
-                      <th key={h} className="table-head whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
+                  <tr>{['N°', 'Dirección', 'Sospechoso', 'Estado', 'Unidad', 'Solicitante', 'Firmas', 'Fecha', ''].map(h => <th key={h}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {items.map(a => (
-                    <tr key={a.id} className="table-row cursor-pointer" onClick={() => setViewId(a.id)}>
-                      <td className="table-cell font-mono text-[9px] text-accent-blue">{a.numeroSolicitud}</td>
-                      <td className="table-cell text-xs text-tx-primary max-w-36 truncate">{a.direccion}</td>
-                      <td className="table-cell text-xs text-tx-secondary max-w-24 truncate">{a.sospechoso || '—'}</td>
-                      <td className="table-cell"><EstadoBadge estado={a.estado} /></td>
-                      <td className="table-cell text-xs text-tx-muted">{a.unidad}</td>
-                      <td className="table-cell text-xs text-tx-secondary">{a.nombreSolicitante}{a.callsignSolicitante && ` [${a.callsignSolicitante}]`}</td>
-                      <td className="table-cell font-mono text-[9px] text-tx-muted text-center">{a.firmas?.length || 0}</td>
-                      <td className="table-cell font-mono text-[9px] text-tx-muted whitespace-nowrap">{new Date(a.fechaSolicitud).toLocaleDateString('es')}</td>
-                      <td className="table-cell">
+                    <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setViewId(a.id)}>
+                      <td><span className="font-mono text-[9px]" style={{ color: 'var(--fib-gold)' }}>{a.numeroSolicitud}</span></td>
+                      <td style={{ maxWidth: 160 }}><span style={{ color: 'var(--fib-text)', fontWeight: 600 }} className="truncate block">{a.direccion}</span></td>
+                      <td style={{ color: 'var(--fib-text3)', fontSize: 11, maxWidth: 100 }} className="truncate">{a.sospechoso || '—'}</td>
+                      <td><span className={`fib-record-badge ${ESTADO_STYLE[a.estado] || ''}`}>{a.estado}</span></td>
+                      <td style={{ color: 'var(--fib-text3)', fontSize: 11 }}>{a.unidad}</td>
+                      <td style={{ color: 'var(--fib-text2)', fontSize: 11 }}>{a.nombreSolicitante}{a.callsignSolicitante && ` [${a.callsignSolicitante}]`}</td>
+                      <td><span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)' }}>{a.firmas?.length || 0}</span></td>
+                      <td><span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)', whiteSpace: 'nowrap' }}>{fmtDate(a.fechaSolicitud)}</span></td>
+                      <td>
                         <div className="flex items-center justify-end gap-2">
-                          <span className="text-tx-dim">›</span>
+                          <span style={{ color: 'var(--fib-gold-dim)' }}>›</span>
                           {user?.rol === 'command_staff' && (
-                            <button className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all"
-                              onClick={async e => {
+                            <button className="fib-action-btn" style={{ border: '1px solid rgba(192,57,43,0.3)', color: '#FF8B7A', padding: '2px 6px' }}
+                              onClick={async (e) => {
                                 e.stopPropagation()
-                                if (!await uiConfirm(`¿Eliminar ${a.numeroSolicitud}?`, { tone: 'danger', title: 'Eliminar solicitud' })) return
+                                if (!await uiConfirm(`¿Eliminar ${a.numeroSolicitud}?`, { tone: 'danger', title: 'Eliminar' })) return
                                 try { await borrarAllanamiento(a.id); notify('Solicitud eliminada') }
-                                catch (err: any) { notify(err.message || 'No se pudo eliminar', false) }
+                                catch (err: any) { notify(err.message || 'Error', false) }
                               }}
-                              title="Eliminar solicitud">
-                              <Trash2 size={12} />
+                              title="Eliminar">
+                              <Trash2 size={11} />
                             </button>
                           )}
                         </div>
@@ -610,8 +697,9 @@ export default function AllanamientosPage() {
                 </tbody>
               </table>
             </div>
-          )
-      }
+          </div>
+        )}
+      </div>
     </div>
   )
 }

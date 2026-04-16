@@ -1,5 +1,14 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
+
+function UtcClock() {
+  const [t, setT] = useState('')
+  useEffect(() => {
+    const tick = () => setT(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC')
+    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
+  }, [])
+  return <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)', fontFamily: 'Share Tech Mono, monospace' }}>{t}</span>
+}
 import {
   Plus, RefreshCw, X, Search, Shield, Send, Users, ChevronRight,
   AlertCircle, CheckCircle, Lock, MessageSquare, User, Activity,
@@ -495,11 +504,10 @@ export default function CasosPage() {
         <span className="fib-logo">FIB</span>
         <span className="fib-topbar-sep">|</span>
         <span className="fib-topbar-label">CASOS &amp; INVESTIGACIONES</span>
-        <span className={`fib-badge-rank ${user?.rol === 'command_staff' ? 'fib-badge-cs' : user?.rol === 'supervisory' ? 'fib-badge-sv' : 'fib-badge-fa'}`}>{user?.rol?.replace('_', ' ').toUpperCase()}</span>
-        <span className="fib-topbar-sep" style={{ marginLeft: 8 }}>|</span>
-        <span className="fib-status-online">● ONLINE</span>
-        <span className="fib-topbar-agent">{user?.nombre || user?.username}{user?.agentNumber ? ` · #${user.agentNumber}` : ''}</span>
-        <button className="fib-sync-btn" onClick={load}>↻ ACTUALIZAR</button>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <UtcClock />
+          <button className="fib-sync-btn" style={{ marginLeft: 0 }} onClick={load}>↻ ACTUALIZAR</button>
+        </div>
       </div>
 
       <div className="fib-main">

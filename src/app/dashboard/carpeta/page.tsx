@@ -125,6 +125,11 @@ export default function CarpetaPage() {
   const [activeSubTab, setActiveSubTab] = useState<'hilos' | 'registros' | 'condecoraciones' | 'chat'>('hilos')
   const [activeSvSub, setActiveSvSub] = useState<'agentes' | 'reportes' | 'sanciones' | 'condecorar'>('agentes')
   const [activeAdSub, setActiveAdSub] = useState<'personal' | 'ascensos' | 'sheet' | 'log'>('personal')
+  const [clock, setClock] = useState('')
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC')
+    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
+  }, [])
   
   // Staff State
   const [staffAgents, setStaffAgents] = useState<any[]>([])
@@ -332,18 +337,10 @@ export default function CarpetaPage() {
         <span className="fib-logo">FIB</span>
         <span className="fib-topbar-sep">|</span>
         <span className="fib-topbar-label">INTEGRAL TACTICAL COMMAND</span>
-        <span className={`fib-badge-rank ${user?.rol === 'command_staff' ? 'fib-badge-cs' : user?.rol === 'supervisory' ? 'fib-badge-sv' : 'fib-badge-fa'}`}>
-          {user?.rol?.replace('_', ' ').toUpperCase()}
-        </span>
-        <span className="fib-topbar-sep" style={{ marginLeft: '8px' }}>|</span>
-        <span className="fib-status-online">● ONLINE</span>
-        <span className="fib-topbar-agent">
-          {user?.nombre || user?.username} {user?.callsign ? `· ${user.callsign}` : ''} {user?.agentNumber ? `· #${user.agentNumber}` : ''}
-        </span>
-        <button className="fib-sync-btn" onClick={syncSheet}>↻ SYNC SHEET</button>
-        <span className="fib-sync-status">
-          <span className="fib-sync-indicator"><span className="fib-sync-dot"></span><span>SINCRONIZADO</span></span>
-        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)', fontFamily: 'Share Tech Mono, monospace' }}>{clock}</span>
+          <button className="fib-sync-btn" style={{ marginLeft: 0 }} onClick={syncSheet}>↻ SYNC SHEET</button>
+        </div>
       </div>
 
       {/* NAV */}

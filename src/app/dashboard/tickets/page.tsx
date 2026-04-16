@@ -1,9 +1,20 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Plus, X, CheckCircle, AlertCircle, Send, ChevronRight, Tag, Clock, User } from 'lucide-react'
-import { getTickets, getTicket, getStoredUser, crearTicket, editarTicket, borrarTicket, subscribeStoredUser } from '@/lib/client'
-import { Toast, ToastType } from '@/components/Toast'
-import { TableSkeleton } from '@/components/Skeleton'
+import { Plus, X, CheckCircle, AlertCircle, Send, ChevronRight, Clock, User } from 'lucide-react'
+import { getTickets, getTicket, getStoredUser, crearTicket, editarTicket, subscribeStoredUser } from '@/lib/client'
+import '../carpeta/carpeta.css'
+
+type ToastType = 'success' | 'error'
+
+function Toast({ msg, type, onClose }: { msg: string; type: ToastType; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  const ok = type === 'success'
+  return (
+    <div className={`fixed bottom-5 right-5 z-[200] flex items-center gap-2 px-4 py-3 border font-mono text-xs ${ok ? 'bg-green-900/40 border-green-700 text-green-300' : 'bg-red-900/40 border-red-700 text-red-300'}`}>
+      {ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />}{msg}
+    </div>
+  )
+}
 
 const ESTADO_COLOR: Record<string,string> = {
   abierto:    'border-green-700 bg-green-900/20 text-green-400',
@@ -295,7 +306,9 @@ export default function TicketsPage() {
       </div>
 
       {/* Ticket list */}
-      {loading ? <TableSkeleton rows={5} cols={5}/>
+      {loading ? (
+        <div className="fib-panel-card p-10 text-center"><p className="fib-section-label" style={{ margin: 0 }}>cargando tickets...</p></div>
+      )
       : tickets.length === 0 ? (
         <div className="card p-14 flex flex-col items-center gap-3 text-tx-muted">
           <p className="font-mono text-xs tracking-widest uppercase">Sin tickets</p>

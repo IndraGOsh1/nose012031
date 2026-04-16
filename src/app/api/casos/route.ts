@@ -32,9 +32,10 @@ export async function POST(req: NextRequest) {
 
   const CasosDB = await getCasosDB()
   const now = new Date().toISOString()
+  const numeroCaso = await nextCaseNumber()
   const caso: Caso = {
     id: `caso-${uuid().slice(0,8)}`,
-    numeroCaso: await nextCaseNumber(),
+    numeroCaso,
     titulo: titulo.trim(), descripcion: descripcion?.trim()||'',
     tipo, estado:'abierto', prioridad: prioridad||'media',
     unidad: unidad||'General', agenteLead: u.username,

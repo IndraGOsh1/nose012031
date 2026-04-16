@@ -203,7 +203,7 @@ export async function PATCH(req: NextRequest, { params }:P) {
       tipo: 'accion',
     })
 
-    afterPersist.push(() => logAllanamiento('↩️ Autorización Retirada', next.numeroSolicitud, u.username))
+    afterPersist.push(() => logAllanamiento('↩️ Autorización Retirada', next.numeroSolicitud ?? undefined, u.username))
   }
 
   if (accion === 'denegar' && isSuperv) {
