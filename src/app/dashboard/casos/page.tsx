@@ -12,12 +12,12 @@ function UtcClock() {
 import {
   Plus, RefreshCw, X, Search, Shield, Send, Users, ChevronRight,
   AlertCircle, CheckCircle, Lock, MessageSquare, User, Activity,
-  ExternalLink, Camera, FileSearch, Image
+  ExternalLink, Camera, FileSearch, Image, Trash2
 } from 'lucide-react'
 import {
   getCasos, getCaso, getStoredUser, crearCaso, editarCaso,
   addAgentToCaso, removeAgentFromCaso, subscribeStoredUser,
-  getAllanamientos
+  getAllanamientos, borrarCaso
 } from '@/lib/client'
 import '../carpeta/carpeta.css'
 
@@ -223,6 +223,21 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
     catch (e: any) { onError(e.message || 'Error') } finally { setSaving(false) }
   }
 
+  async function eliminarCaso() {
+    const ok = await import('@/lib/ui-dialog').then(m => m.uiConfirm(
+      `¿Eliminar permanentemente el caso ${caso?.numeroCaso}? Esta acción no se puede deshacer.`,
+      { title: 'ELIMINAR CASO', confirmText: 'ELIMINAR', tone: 'danger' }
+    ))
+    if (!ok) return
+    setSaving(true)
+    try {
+      await borrarCaso(casoId)
+      onUpdate('Caso eliminado')
+      onClose()
+    } catch (e: any) { onError(e.message || 'Error al eliminar') }
+    finally { setSaving(false) }
+  }
+
   async function registrarHallazgo(allanamientoId: string, d: any) {
     setSaving(true)
     try {
@@ -272,6 +287,17 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {isSuperv && <button onClick={() => setShowAccess(true)} className="fib-action-btn" title="Gestionar acceso"><Users size={12} /></button>}
+              {isCS && (
+                <button
+                  onClick={eliminarCaso}
+                  disabled={saving}
+                  className="fib-action-btn"
+                  title="Eliminar caso (Command Staff)"
+                  style={{ color: 'var(--fib-red2)', borderColor: 'rgba(192,57,43,0.3)' }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
               <button onClick={onClose} className="fib-action-btn"><X size={13} /></button>
             </div>
           </div>

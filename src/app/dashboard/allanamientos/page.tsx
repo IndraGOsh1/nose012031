@@ -197,8 +197,8 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    if (atBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [item?.mensajes])
+    if (tab === 'chat' && atBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [item?.mensajes, tab])
 
   function onChatScroll() {
     const el = scrollRef.current
@@ -242,12 +242,16 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
     finally { setSending(false) }
   }
 
-  async function addFotoToAlbum(url: string) {
-    if (!url.trim()) return
-    const normalized = normalizeImgUrl(url.trim())
-    if (!/^https?:\/\//i.test(normalized)) { uiAlert('URL inválida', 'Álbum'); return }
+  async function addFotoToAlbum(urls: string[], descripcion: string) {
+    const validUrls = urls.map(u => normalizeImgUrl(u.trim())).filter(u => /^https?:\/\//i.test(u))
+    if (validUrls.length === 0) { uiAlert('URL inválida', 'Álbum'); return }
     setSending(true)
-    try { await editarAllanamiento(itemId, { addFoto: normalized }); await load(); onAction('Foto añadida') }
+    try {
+      for (const u of validUrls) {
+        await editarAllanamiento(itemId, { addFoto: u, fotoDescripcion: descripcion.trim() || undefined })
+      }
+      await load(); onAction(`${validUrls.length} foto(s) añadida(s)`)
+    }
     catch (e: any) { uiAlert(e?.message || 'Error', 'Álbum') }
     finally { setSending(false) }
   }
@@ -277,7 +281,11 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
 
   const canChat = isSuperv || (item.solicitadoPor === user?.username && item.estado === 'pendiente')
   const yafirmo = item.firmas?.some((f: any) => f.username === user?.username)
-  const album: string[] = item.albumFotos || []
+  // Álbum: soporte retrocompatible — string o {url, descripcion, fecha}
+  const albumRaw: any[] = item.albumFotos || []
+  const album: { url: string; descripcion?: string; fecha?: string }[] = albumRaw.map((e: any) =>
+    typeof e === 'string' ? { url: e } : e
+  )
 
   const TABS = [
     { id: 'info' as const,  label: 'Información' },
@@ -482,7 +490,7 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
             <div style={{ height: '100%', overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="flex items-center justify-between">
                 <div className="fib-section-label" style={{ margin: 0 }}>// álbum de evidencia fotográfica</div>
-                <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)' }}>{album.length}/20 fotos</span>
+                <span className="font-mono text-[9px]" style={{ color: 'var(--fib-text4)' }}>{album.length}/20 entradas</span>
               </div>
 
               {album.length === 0 && (
@@ -493,22 +501,41 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
               )}
 
               {album.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                  {album.map((url: string, i: number) => {
-                    const normalized = normalizeImgUrl(url)
-                    const isImg = isImgUrl(url)
-                    return isImg ? (
-                      <a key={i} href={normalized} target="_blank" rel="noreferrer" style={{ display: 'block', border: '1px solid var(--fib-border)', overflow: 'hidden', position: 'relative' }}>
-                        <img src={normalized} alt={`Foto ${i + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', background: '#000', display: 'block' }}
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '4px 6px', background: 'rgba(0,0,0,0.6)', fontFamily: 'Share Tech Mono, monospace', fontSize: 8, color: 'var(--fib-text4)' }}>
-                          FOTO {i + 1}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {album.map((entry, i: number) => {
+                    const normalized = normalizeImgUrl(entry.url)
+                    const isImg = isImgUrl(entry.url)
+                    return (
+                      <div key={i} className="fib-panel-card" style={{ overflow: 'hidden' }}>
+                        {isImg ? (
+                          <a href={normalized} target="_blank" rel="noreferrer" style={{ display: 'block', borderBottom: entry.descripcion ? '1px solid var(--fib-border)' : 'none' }}>
+                            <img src={normalized} alt={`Foto ${i + 1}`}
+                              style={{ width: '100%', maxHeight: 260, objectFit: 'contain', background: '#000', display: 'block' }}
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                          </a>
+                        ) : (
+                          <a href={entry.url} target="_blank" rel="noreferrer"
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderBottom: entry.descripcion ? '1px solid var(--fib-border)' : 'none', fontFamily: 'Share Tech Mono, monospace', fontSize: 10, color: '#7AABFF' }}>
+                            <ExternalLink size={11} style={{ flexShrink: 0 }} />
+                            <span style={{ wordBreak: 'break-all' }}>{entry.url}</span>
+                          </a>
+                        )}
+                        {entry.descripcion && (
+                          <div style={{ padding: '8px 14px', background: 'rgba(5,7,10,0.5)' }}>
+                            <p style={{ fontFamily: 'Share Tech Mono, monospace', fontSize: 8, color: 'var(--fib-gold-dim)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>descripción</p>
+                            <p style={{ fontSize: 12, color: 'var(--fib-text2)', lineHeight: 1.5 }}>{entry.descripcion}</p>
+                          </div>
+                        )}
+                        <div style={{ padding: '4px 14px 6px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontFamily: 'Share Tech Mono, monospace', fontSize: 8, color: 'var(--fib-text4)' }}>FOTO {i + 1}</span>
+                          {entry.fecha && <span style={{ fontFamily: 'Share Tech Mono, monospace', fontSize: 8, color: 'var(--fib-text4)' }}>· {new Date(entry.fecha).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                          {isSuperv && (
+                            <button onClick={() => editarAllanamiento(itemId, { removeFoto: entry.url }).then(() => load())}
+                              style={{ marginLeft: 'auto', color: 'var(--fib-red2)', opacity: 0.6, fontSize: 9 }}
+                              title="Eliminar foto">✕</button>
+                          )}
                         </div>
-                      </a>
-                    ) : (
-                      <a key={i} href={url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 8, border: '1px solid var(--fib-border)', fontFamily: 'Share Tech Mono, monospace', fontSize: 9, color: '#7AABFF', wordBreak: 'break-all' }}>
-                        <ExternalLink size={9} style={{ flexShrink: 0 }} />{url.slice(0, 30)}...
-                      </a>
+                      </div>
                     )
                   })}
                 </div>
@@ -516,7 +543,7 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
 
               {(isSuperv || item.solicitadoPor === user?.username) && album.length < 20 && (
                 <div className="fib-panel-card">
-                  <div className="fib-panel-card-header">// añadir foto al álbum</div>
+                  <div className="fib-panel-card-header">// añadir evidencia al álbum</div>
                   <div className="fib-panel-card-body">
                     <AddFotoForm onAdd={addFotoToAlbum} saving={sending} />
                   </div>
@@ -553,15 +580,86 @@ function ModalAllanamiento({ itemId, user, onClose, onAction }: { itemId: string
   )
 }
 
-function AddFotoForm({ onAdd, saving }: { onAdd: (url: string) => void; saving: boolean }) {
-  const [url, setUrl] = useState('')
-  const normalized = normalizeImgUrl(url)
-  const preview = url && isImgUrl(url)
+function AddFotoForm({ onAdd, saving }: { onAdd: (urls: string[], descripcion: string) => void; saving: boolean }) {
+  const [urls, setUrls] = useState([''])
+  const [descripcion, setDescripcion] = useState('')
+
+  function setUrl(i: number, v: string) { setUrls(p => { const n = [...p]; n[i] = v; return n }) }
+  function addUrl() { if (urls.length < 8) setUrls(p => [...p, '']) }
+  function removeUrl(i: number) { setUrls(p => p.filter((_, j) => j !== i)) }
+
+  const validUrls = urls.filter(u => u.trim() && /^https?:\/\//i.test(normalizeImgUrl(u.trim())))
+  const canSubmit = validUrls.length > 0 && !saving
+
+  function submit() {
+    if (!canSubmit) return
+    onAdd(urls, descripcion)
+    setUrls([''])
+    setDescripcion('')
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <input className="fib-form-ctrl" placeholder="https://i.imgur.com/... o URL de imagen directa" value={url} onChange={e => setUrl(e.target.value)} />
-      {preview && <img src={normalized} alt="Preview" style={{ maxHeight: 120, objectFit: 'contain', border: '1px solid var(--fib-border)', background: 'rgba(0,0,0,0.3)' }} onError={e => (e.target as HTMLImageElement).style.display = 'none'} />}
-      <button onClick={() => { onAdd(url); setUrl('') }} disabled={saving || !url.trim()} className="fib-add-btn w-fit" style={{ borderRadius: 3, fontSize: 10 }}>AÑADIR AL ÁLBUM</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* URLs */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <label className="fib-form-label" style={{ margin: 0 }}>URL(s) de imagen / evidencia</label>
+          {urls.length < 8 && (
+            <button type="button" onClick={addUrl} className="fib-action-btn" style={{ padding: '2px 8px', fontSize: 9 }}>+ URL</button>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {urls.map((u, i) => {
+            const normalized = normalizeImgUrl(u)
+            const isImg = u && isImgUrl(u)
+            return (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    className="fib-form-ctrl flex-1"
+                    style={{ fontSize: 11 }}
+                    placeholder="https://i.imgur.com/... o link directo"
+                    value={u}
+                    onChange={e => setUrl(i, e.target.value)}
+                  />
+                  {urls.length > 1 && (
+                    <button type="button" onClick={() => removeUrl(i)} style={{ color: 'var(--fib-red2)', flexShrink: 0 }}>
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                {isImg && (
+                  <img src={normalized} alt="Preview"
+                    style={{ maxHeight: 100, objectFit: 'contain', border: '1px solid var(--fib-border)', background: 'rgba(0,0,0,0.3)', borderRadius: 2 }}
+                    onError={e => (e.target as HTMLImageElement).style.display = 'none'} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Descripción */}
+      <div>
+        <label className="fib-form-label">Descripción breve (opcional)</label>
+        <textarea
+          className="fib-form-ctrl w-full"
+          rows={2}
+          placeholder="¿Qué muestra esta evidencia? (ej: Arma incautada en dormitorio principal)"
+          value={descripcion}
+          onChange={e => setDescripcion(e.target.value)}
+          style={{ resize: 'none', fontSize: 12 }}
+        />
+      </div>
+
+      <button
+        onClick={submit}
+        disabled={!canSubmit}
+        className="fib-add-btn w-fit"
+        style={{ borderRadius: 3, fontSize: 10 }}
+      >
+        {saving ? 'AÑADIENDO...' : `AÑADIR AL ÁLBUM${validUrls.length > 1 ? ` (${validUrls.length} fotos)` : ''}`}
+      </button>
     </div>
   )
 }

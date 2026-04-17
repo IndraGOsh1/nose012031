@@ -39,7 +39,7 @@ export interface Allanamiento {
   observaciones:    string
   mensajes:         MensajeAllanamiento[]
   actualizadoEn:    string
-  albumFotos?:      string[]
+  albumFotos?:      (string | { url: string; descripcion?: string; fecha?: string })[]
 }
 
 import { SupabaseMap, persistentMapDelete, persistentMapSet } from './supabase-map'

@@ -371,14 +371,20 @@ export async function PATCH(req: NextRequest, { params }:P) {
     if (!url || !/^https?:\/\//i.test(url)) return err('URL de foto inválida')
     if (!Array.isArray(next.albumFotos)) next.albumFotos = []
     if (next.albumFotos.length >= 20) return err('Máximo 20 fotos por allanamiento')
-    next.albumFotos.push(url)
+    const fotoDescripcion = body.fotoDescripcion ? String(body.fotoDescripcion).trim().slice(0, 300) : undefined
+    const fotoEntry = fotoDescripcion
+      ? { url, descripcion: fotoDescripcion, fecha: now }
+      : { url, fecha: now }
+    next.albumFotos.push(fotoEntry)
   }
 
   if (body.removeFoto !== undefined) {
     const canRemove = isSuperv || isIndra
     if (!canRemove) return forbidden()
     const url = String(body.removeFoto || '').trim()
-    next.albumFotos = (next.albumFotos || []).filter(f => f !== url)
+    next.albumFotos = (next.albumFotos || []).filter((f: any) =>
+      typeof f === 'string' ? f !== url : f.url !== url
+    )
   }
 
   next.actualizadoEn = now

@@ -2,6 +2,14 @@ export type EstadoTicket = 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'
 export type PrioridadTicket = 'baja' | 'media' | 'alta' | 'urgente'
 export type TipoTicket = 'solicitud' | 'reporte' | 'consulta' | 'otro'
 
+/**
+ * Categorías de ticket:
+ *  - contacto_supervisory : Visible para todos los supervisory_staff
+ *  - contacto_directiva   : Solo command_staff + supervisory con acceso explícito
+ *  - quejas_denuncia      : Solo command_staff + supervisory con acceso explícito
+ */
+export type CategoriaTicket = 'contacto_supervisory' | 'contacto_directiva' | 'quejas_denuncia'
+
 export interface ComentarioTicket {
   id:       string
   autor:    string
@@ -11,21 +19,24 @@ export interface ComentarioTicket {
 }
 
 export interface Ticket {
-  id:          string
-  numeroTicket:string
-  titulo:      string
-  descripcion: string
-  tipo:        TipoTicket
-  estado:      EstadoTicket
-  prioridad:   PrioridadTicket
-  creadoPor:   string
-  asignadoA:   string | null
-  comentarios: ComentarioTicket[]
-  creadoEn:    string
+  id:           string
+  numeroTicket: string
+  titulo:       string
+  descripcion:  string
+  tipo:         TipoTicket
+  categoria:    CategoriaTicket
+  estado:       EstadoTicket
+  prioridad:    PrioridadTicket
+  creadoPor:    string
+  asignadoA:    string | null
+  comentarios:  ComentarioTicket[]
+  creadoEn:     string
   actualizadoEn:string
-  resueltoPor: string | null
-  resueltoEn:  string | null
-  tags:        string[]
+  resueltoPor:  string | null
+  resueltoEn:   string | null
+  tags:         string[]
+  /** Usernames de supervisory_staff con acceso explícito (para categorías restringidas) */
+  accesoGrantado: string[]
 }
 
 import { SupabaseMap, persistentMapDelete, persistentMapSet } from './supabase-map'
@@ -42,9 +53,10 @@ const initialTickets: Ticket[] = [
   {
     id:'tkt-001', numeroTicket:'TKT-001', titulo:'Solicitud de equipamiento ERT',
     descripcion:'Se requieren 4 chalecos nuevos para el equipo ERT tras el último operativo.',
-    tipo:'solicitud', estado:'abierto', prioridad:'media',
+    tipo:'solicitud', categoria:'contacto_supervisory', estado:'abierto', prioridad:'media',
     creadoPor:'Agente1', asignadoA:null, comentarios:[],
-    creadoEn:new Date().toISOString(), actualizadoEn:new Date().toISOString(), resueltoPor:null, resueltoEn:null, tags:['ert','equipamiento'],
+    creadoEn:new Date().toISOString(), actualizadoEn:new Date().toISOString(),
+    resueltoPor:null, resueltoEn:null, tags:['ert','equipamiento'], accesoGrantado:[],
   }
 ]
 
