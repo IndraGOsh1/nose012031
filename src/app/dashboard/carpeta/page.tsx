@@ -472,12 +472,19 @@ export default function CarpetaPage() {
                                       ))}
                                     </div>
                                     <div className="fib-add-entry-row">
-                                      <input 
+                                      <textarea 
                                         className="fib-entry-input" 
-                                        placeholder="Escribe una respuesta o actualización..."
+                                        placeholder="Escribe una respuesta o actualización... (Shift+Enter para nueva línea)"
                                         value={threadReply}
+                                        rows={2}
                                         onChange={e => setThreadReply(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && responderHilo(hilo.id, selectedAgent?.username)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault()
+                                            responderHilo(hilo.id, selectedAgent?.username)
+                                          }
+                                        }}
+                                        style={{ resize: 'vertical', minHeight: '38px' }}
                                       />
                                       <button 
                                         className="fib-add-btn" 
