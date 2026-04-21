@@ -143,6 +143,8 @@ export default function CarpetaPage() {
   const [saving, setSaving] = useState(false)
   const [expandedHilo, setExpandedHilo] = useState<string | null>(null)
   const [logs, setLogs] = useState<{ts: string, msg: string}[]>([])
+  const [showNuevoHilo, setShowNuevoHilo] = useState(false)
+  const [nuevoHiloForm, setNuevoHiloForm] = useState({ titulo: '', participantes: '' })
 
   const isStaff = ['command_staff', 'supervisory'].includes(user?.rol)
   const isAdmin = user?.rol === 'command_staff'
@@ -277,18 +279,18 @@ export default function CarpetaPage() {
   }
 
   async function crearNuevoHilo() {
-    const titulo = prompt('Título del nuevo hilo:')
-    if (!titulo) return
-    const participantesStr = prompt('Participantes (separados por coma, ej: user1, user2):') || ''
-    const participantes = participantesStr.split(',').map(s => s.trim()).filter(Boolean)
-    
+    const { titulo, participantes: participantesStr } = nuevoHiloForm
+    if (!titulo.trim()) return
+    const participantes = participantesStr.split(',').map((s: string) => s.trim()).filter(Boolean)
     setSaving(true)
     try {
-      await crearHiloCarpeta({ titulo, descripcion: '', participantes })
+      await crearHiloCarpeta({ titulo: titulo.trim(), descripcion: '', participantes })
       addLog(`Nuevo hilo creado: ${titulo}`)
       const c = await getCarpeta()
       setOwnCarpeta(c)
       setToast({ msg: 'Hilo creado correctamente', ok: true })
+      setShowNuevoHilo(false)
+      setNuevoHiloForm({ titulo: '', participantes: '' })
     } catch (e: any) {
       setToast({ msg: e.message, ok: false })
     } finally {
@@ -296,7 +298,6 @@ export default function CarpetaPage() {
     }
   }
 
-  // Derived Data
   const currentAgente = selectedAgent ? {
     nombre: selectedAgent.nombre,
     rango: selectedAgent.rango,
@@ -331,6 +332,32 @@ export default function CarpetaPage() {
   return (
     <div className="fib-panel-container">
       {toast && <Toast msg={toast.msg} ok={toast.ok} onClose={() => setToast(null)} />}
+
+      {/* MODAL NUEVO HILO */}
+      {showNuevoHilo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={e => e.target === e.currentTarget && setShowNuevoHilo(false)}>
+          <div style={{ background: '#0A0D10', border: '1px solid #1B2229', maxWidth: 440, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1B2229' }}>
+              <div><div className="fib-section-label" style={{ margin: 0 }}>// nuevo hilo</div><p className="text-sm font-bold tracking-widest uppercase mt-1" style={{ color: '#E6ECF2' }}>Crear Hilo</p></div>
+              <button onClick={() => setShowNuevoHilo(false)} style={{ color: '#8A96A3' }}>✕</button>
+            </div>
+            <div className="p-5 flex flex-col gap-3">
+              <div>
+                <label className="fib-form-label">Título *</label>
+                <input className="fib-form-ctrl w-full" placeholder="Ej: Reporte de actividad semanal" value={nuevoHiloForm.titulo} onChange={e => setNuevoHiloForm(p => ({ ...p, titulo: e.target.value }))} onKeyDown={e => e.key === 'Enter' && crearNuevoHilo()} />
+              </div>
+              <div>
+                <label className="fib-form-label">Participantes (opcional, separados por coma)</label>
+                <input className="fib-form-ctrl w-full" placeholder="Ej: user1, user2" value={nuevoHiloForm.participantes} onChange={e => setNuevoHiloForm(p => ({ ...p, participantes: e.target.value }))} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowNuevoHilo(false)} className="fib-action-btn flex-1 py-2">Cancelar</button>
+                <button onClick={crearNuevoHilo} disabled={!nuevoHiloForm.titulo.trim() || saving} className="fib-add-btn flex-1 disabled:opacity-40" style={{ borderRadius: 4, fontSize: 11 }}>{saving ? 'Creando...' : 'CREAR HILO'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}}
 
       {/* TOPBAR */}
       <div className="fib-topbar">
@@ -444,7 +471,7 @@ export default function CarpetaPage() {
                       <div id="sub-hilos">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                           <div className="fib-section-label" style={{ margin: 0 }}>actividad del agente</div>
-                          {!selectedAgent && <button className="fib-add-btn" onClick={crearNuevoHilo}>+ NUEVO HILO</button>}
+                          {!selectedAgent && <button className="fib-add-btn" onClick={() => setShowNuevoHilo(true)}>+ NUEVO HILO</button>}
                         </div>
                         <div id="hilos-container">
                           {currentCarpeta?.hilos?.length === 0 ? (
@@ -467,7 +494,7 @@ export default function CarpetaPage() {
                                       {(hilo.mensajes || []).map((m: any) => (
                                         <div key={m.id} className="fib-entry-item">
                                           <div className="fib-entry-date">{new Date(m.fecha).toLocaleString('es')} · {m.nombre}</div>
-                                          <div className="fib-entry-text">{m.contenido}</div>
+                                          <div className="fib-entry-text" style={{ whiteSpace: 'pre-wrap' }}>{m.contenido}</div>
                                         </div>
                                       ))}
                                     </div>

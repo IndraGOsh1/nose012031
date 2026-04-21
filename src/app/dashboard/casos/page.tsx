@@ -519,6 +519,7 @@ export default function CasosPage() {
 
   const filtered = casos.filter(c => !search || c.titulo?.toLowerCase().includes(search.toLowerCase()) || c.numeroCaso?.toLowerCase().includes(search.toLowerCase()) || c.tipo?.toLowerCase().includes(search.toLowerCase()))
   const isSuperv = ['command_staff', 'supervisory'].includes(user?.rol || '')
+  const canCreateCaso = !!user  // cualquier agente logueado puede abrir un caso
 
   return (
     <div className="fib-panel-container">
@@ -565,7 +566,7 @@ export default function CasosPage() {
             {['abierto', 'en_progreso', 'cerrado', 'archivado'].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <button onClick={load} className="fib-action-btn py-2 px-3"><RefreshCw size={12} className={loading ? 'animate-spin' : ''} /></button>
-          {isSuperv && <button onClick={() => setShowCreate(true)} className="fib-add-btn flex items-center gap-2" style={{ borderRadius: 4, fontSize: 11 }}><Plus size={12} /> ABRIR CASO</button>}
+          {canCreateCaso && <button onClick={() => setShowCreate(true)} className="fib-add-btn flex items-center gap-2" style={{ borderRadius: 4, fontSize: 11 }}><Plus size={12} /> ABRIR CASO</button>}
         </div>
 
         {/* Table */}
