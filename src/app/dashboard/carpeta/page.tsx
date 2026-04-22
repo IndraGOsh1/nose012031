@@ -335,7 +335,7 @@ export default function CarpetaPage() {
 
       {/* MODAL NUEVO HILO */}
       {showNuevoHilo && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={e => e.target === e.currentTarget && setShowNuevoHilo(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={e => { if (e.target === e.currentTarget) setShowNuevoHilo(false) }}>
           <div style={{ background: '#0A0D10', border: '1px solid #1B2229', maxWidth: 440, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #1B2229' }}>
               <div><div className="fib-section-label" style={{ margin: 0 }}>// nuevo hilo</div><p className="text-sm font-bold tracking-widest uppercase mt-1" style={{ color: '#E6ECF2' }}>Crear Hilo</p></div>
@@ -357,7 +357,7 @@ export default function CarpetaPage() {
             </div>
           </div>
         </div>
-      )}}
+      )}
 
       {/* TOPBAR */}
       <div className="fib-topbar">
