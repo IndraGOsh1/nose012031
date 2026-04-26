@@ -94,7 +94,7 @@ export default function ChatPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval>>()
   const lastMsgIdRef = useRef<string>('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -383,7 +383,7 @@ export default function ChatPage() {
                                 onError={e => ((e.target as HTMLImageElement).style.display = 'none')} />
                             </a>
                           ) : (
-                            <p style={{ fontSize: 13, color: 'var(--fib-text2)', lineHeight: 1.55, wordBreak: 'break-word' }}>{m.contenido}</p>
+                            <p style={{ fontSize: 13, color: 'var(--fib-text2)', lineHeight: 1.55, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{m.contenido}</p>
                           )}
                         </div>
                       ))}
@@ -422,10 +422,14 @@ export default function ChatPage() {
                     style={{ padding: '10px 11px', color: 'var(--fib-text4)', background: 'none', border: 'none', borderRight: '1px solid var(--fib-border)', cursor: 'pointer', flexShrink: 0 }}>
                     <ImageIcon size={13} />
                   </button>
-                  <input ref={inputRef}
-                    style={{ flex: 1, background: 'transparent', padding: '10px 12px', fontSize: 13, color: 'var(--fib-text)', outline: 'none', fontFamily: 'Barlow, sans-serif' }}
+                  <textarea ref={inputRef}
+                    rows={1}
+                    style={{ flex: 1, background: 'transparent', padding: '10px 12px', fontSize: 13, color: 'var(--fib-text)', outline: 'none', fontFamily: 'Barlow, sans-serif', resize: 'none', lineHeight: '1.5', maxHeight: 120, overflowY: 'auto' }}
                     placeholder={`Mensaje en ${canalInfo?.tipo === 'dm' ? '@' : '#'}${canalInfo?.nombre || canalActivo}...`}
-                    value={texto} onChange={e => setTexto(e.target.value)} disabled={sending} autoComplete="off" />
+                    value={texto}
+                    onChange={e => { setTexto(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(e as any) } }}
+                    disabled={sending} autoComplete="off" />
                   <button type="submit" disabled={sending || !texto.trim()}
                     style={{ padding: '10px 14px', color: texto.trim() ? 'var(--fib-gold)' : 'var(--fib-text4)', background: 'none', border: 'none', cursor: 'pointer', transition: 'color .15s', flexShrink: 0 }}>
                     <Send size={14} />

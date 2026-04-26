@@ -12,7 +12,7 @@ function UtcClock() {
 import {
   Plus, RefreshCw, X, Search, Shield, Send, Users, ChevronRight,
   AlertCircle, CheckCircle, Lock, MessageSquare, User, Activity,
-  ExternalLink, Camera, FileSearch, Image, Trash2
+  ExternalLink, Camera, FileSearch, Image, Trash2, FileText
 } from 'lucide-react'
 import {
   getCasos, getCaso, getStoredUser, crearCaso, editarCaso,
@@ -178,7 +178,7 @@ function NotasChat({ notas, user, canEdit, onAdd }: { notas: any[]; user: any; c
                   {n.privada && <span className="font-mono text-[7px] px-1" style={{ color: '#F1C40F', border: '1px solid #665500' }}>privada</span>}
                   <span className="font-mono text-[7px]" style={{ color: '#4A5560' }}>{fmtDT(n.fecha)}</span>
                 </div>
-                <div className="px-3 py-2 text-sm leading-relaxed" style={{ background: isMe ? 'rgba(27,111,255,0.12)' : n.privada ? 'rgba(241,196,15,0.06)' : '#0E1217', border: `1px solid ${isMe ? 'rgba(27,111,255,0.2)' : n.privada ? 'rgba(241,196,15,0.2)' : '#1B2229'}`, color: '#C8D4E0' }}>{n.contenido}</div>
+                <div className="px-3 py-2 text-sm leading-relaxed" style={{ background: isMe ? 'rgba(27,111,255,0.12)' : n.privada ? 'rgba(241,196,15,0.06)' : '#0E1217', border: `1px solid ${isMe ? 'rgba(27,111,255,0.2)' : n.privada ? 'rgba(241,196,15,0.2)' : '#1B2229'}`, color: '#C8D4E0', whiteSpace: 'pre-wrap' }}>{n.contenido}</div>
               </div>
             </div>
           )
@@ -189,7 +189,7 @@ function NotasChat({ notas, user, canEdit, onAdd }: { notas: any[]; user: any; c
         <div style={{ padding: 12, borderTop: '1px solid #1B2229', flexShrink: 0 }}>
           <form onSubmit={e => { e.preventDefault(); if (!texto.trim()) return; onAdd(texto.trim(), privada); setTexto('') }} className="flex flex-col gap-2">
             <div className="flex items-center gap-2" style={{ background: '#0E1217', border: '1px solid #1B2229' }}>
-              <input className="flex-1 bg-transparent px-3 py-2.5 text-sm focus:outline-none" style={{ color: '#E6ECF2' }} placeholder="Añadir nota al caso..." value={texto} onChange={e => setTexto(e.target.value)} />
+              <textarea className="flex-1 bg-transparent px-3 py-2.5 text-sm focus:outline-none" rows={1} style={{ color: '#E6ECF2', resize: 'none', maxHeight: 100, overflowY: 'auto', lineHeight: '1.5' }} placeholder="Añadir nota al caso..." value={texto} onChange={e => { setTexto(e.target.value); (e.target as HTMLTextAreaElement).style.height = 'auto'; (e.target as HTMLTextAreaElement).style.height = Math.min(e.target.scrollHeight, 100) + 'px' }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (texto.trim()) { onAdd(texto.trim(), privada); setTexto('') } } }} />
               <button type="submit" disabled={!texto.trim()} className="px-3 py-2.5 disabled:opacity-30 transition-colors shrink-0" style={{ color: '#8A96A3' }}><Send size={13} /></button>
             </div>
             {isCS && <label className="flex items-center gap-2 cursor-pointer self-end"><input type="checkbox" checked={privada} onChange={e => setPrivada(e.target.checked)} className="w-3 h-3" /><span className="font-mono text-[8px] uppercase" style={{ color: '#8A96A3' }}>Nota privada (solo CS)</span></label>}
@@ -202,7 +202,7 @@ function NotasChat({ notas, user, canEdit, onAdd }: { notas: any[]; user: any; c
 
 function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: string; user: any; onClose: () => void; onUpdate: (m: string) => void; onError: (m: string) => void }) {
   const [caso, setCaso] = useState<any>(null)
-  const [tab, setTab] = useState<'notas' | 'info' | 'sospechosos' | 'allanamientos' | 'hallazgos' | 'timeline'>('notas')
+  const [tab, setTab] = useState<'notas' | 'info' | 'sospechosos' | 'allanamientos' | 'hallazgos' | 'timeline' | 'evidencias'>('notas')
   const [showAccess, setShowAccess] = useState(false)
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false)
   const [alls, setAlls] = useState<any[]>([])
@@ -266,6 +266,7 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
     { id: 'allanamientos' as const, label: 'Allanamientos', icon: <Shield size={11} />, count: alls.length },
     { id: 'hallazgos' as const, label: 'Hallazgos / Álbum', icon: <Camera size={11} /> },
     { id: 'timeline' as const, label: 'Timeline', icon: <Activity size={11} />, count: caso.timeline?.length || 0 },
+    { id: 'evidencias' as const, label: 'Evidencias', icon: <FileText size={11} />, count: caso.evidencias?.length || 0 },
   ]
 
   return (
@@ -456,6 +457,41 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
                         const d = (document.getElementById('tl-d') as HTMLInputElement)?.value?.trim()
                         if (a) { action({ addTimeline: { accion: a, detalle: d } }, 'Entrada agregada'); (document.getElementById('tl-a') as HTMLInputElement).value = ''; (document.getElementById('tl-d') as HTMLInputElement).value = '' }
                       }}>+ AÑADIR</button>
+                    </div>
+                  </div>
+                )}
+              </>}
+
+              {tab === 'evidencias' && <>
+                {(caso.evidencias?.length === 0 || !caso.evidencias) && <div className="fib-panel-card p-10 text-center" style={{ opacity: 0.4 }}><FileText size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin evidencias registradas en este caso</p></div>}
+                {(caso.evidencias || []).map((ev: any) => (
+                  <div key={ev.id} className="fib-entry-item" style={{ borderLeftColor: '#F1C40F' }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-bold text-xs tracking-wide uppercase" style={{ color: '#E6ECF2' }}>{ev.titulo}</p>
+                      <span className="font-mono text-[8px] px-2 py-0.5" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{ev.tipo}</span>
+                    </div>
+                    {ev.descripcion && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{ev.descripcion}</p>}
+                    <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>Subido por {ev.subidoPor}</p>
+                    {ev.url && <a href={ev.url} target="_blank" rel="noreferrer" className="font-mono text-[9px] mt-1 flex items-center gap-1" style={{ color: '#1B6FFF' }}><ExternalLink size={9} />{ev.url.length > 60 ? ev.url.slice(0, 60) + '...' : ev.url}</a>}
+                  </div>
+                ))}
+                {canEdit && (
+                  <div className="fib-panel-card">
+                    <div className="fib-panel-card-header">// registrar evidencia</div>
+                    <div className="fib-panel-card-body flex flex-col gap-2">
+                      <input className="fib-form-ctrl" id="ev-titulo" placeholder="Título de la evidencia *" />
+                      <input className="fib-form-ctrl" id="ev-tipo" placeholder="Tipo (imagen, documento, video, otro...)" />
+                      <textarea className="fib-form-ctrl" id="ev-desc" rows={2} placeholder="Descripción del hallazgo o evidencia" style={{ resize: 'none' }} />
+                      <input className="fib-form-ctrl" id="ev-url" placeholder="URL (Imgur, Drive, etc.) — opcional" />
+                      <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
+                        const titulo = (document.getElementById('ev-titulo') as HTMLInputElement)?.value?.trim()
+                        if (!titulo) return
+                        const tipo = (document.getElementById('ev-tipo') as HTMLInputElement)?.value?.trim() || 'otro'
+                        const descripcion = (document.getElementById('ev-desc') as HTMLTextAreaElement)?.value?.trim() || ''
+                        const url = (document.getElementById('ev-url') as HTMLInputElement)?.value?.trim() || undefined
+                        action({ addEvidencia: { titulo, tipo, descripcion, url } }, 'Evidencia registrada');
+                        ['ev-titulo','ev-tipo','ev-desc','ev-url'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
+                      }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR EVIDENCIA'}</button>
                     </div>
                   </div>
                 )}
