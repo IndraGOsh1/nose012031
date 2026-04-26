@@ -35,6 +35,24 @@ export interface Nota {
   privada:  boolean
 }
 
+export interface LineaInvestigacion {
+  id:       string
+  titulo:   string
+  detalle:  string
+  estado:   'activa' | 'descartada' | 'confirmada'
+  autor:    string
+  fecha:    string
+}
+
+export interface CasoRelacionado {
+  casoId:     string
+  numeroCaso: string
+  titulo:     string
+  relacion:   string
+  fecha:      string
+  autor:      string
+}
+
 export interface Caso {
   id:           string
   numeroCaso:   string
@@ -51,6 +69,8 @@ export interface Caso {
   evidencias:   Evidencia[]
   notas:        Nota[]
   timeline:     EntradaTimeline[]
+  lineas:       LineaInvestigacion[]
+  casosRelacionados: CasoRelacionado[]
   creadoPor:    string
   creadoEn:     string
   actualizadoEn:string
@@ -75,6 +95,8 @@ const initialCasos: Caso[] = [
     tipo: 'Crimen Organizado', estado: 'en_progreso', prioridad: 'alta',
     unidad: 'CIRG', agenteLead: 'Director', agentesAsignados: ['Director','Supervisor'], agentesAcceso: ['Director','Supervisor'],
     sospechosos: [{ id:'s1', nombre:'John Doe', alias:'El Fantasma', descripcion:'Líder presunto de la organización', estado:'prófugo' }],
+    lineas: [],
+    casosRelacionados: [],
     evidencias: [{ id:'e1', titulo:'Fotografías del puerto', tipo:'imagen', descripcion:'Capturas de vigilancia nocturna', subidoPor:'Director', fecha:new Date().toISOString() }],
     notas: [{ id:'n1', contenido:'Fuente confidencial confirmó reunión el martes.', autor:'Director', fecha:new Date().toISOString(), privada:true }],
     timeline: [
