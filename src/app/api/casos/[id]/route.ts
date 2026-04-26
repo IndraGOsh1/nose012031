@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuid } from 'uuid'
 import { getUser, unauthorized, forbidden, notFound, err, isUserFrozen, frozen } from '@/lib/auth'
-import { deleteCasoById, getCasosDB, persistCaso, canAccessCaso } from '@/lib/casos-db'
+import { deleteCasoById, getCasosDB, CasosDB, persistCaso, canAccessCaso } from '@/lib/casos-db'
 
 const ESTADOS = new Set(['abierto', 'en_progreso', 'cerrado', 'archivado'])
 const PRIORIDADES = new Set(['baja', 'media', 'alta', 'critica'])
@@ -92,6 +92,60 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const contenido = String(body.addNota?.contenido || '').trim()
     if (!contenido || contenido.length > 3000) return err('Nota invalida (1-3000 caracteres)')
     next.notas.push({ id:uuid().slice(0,8), autor:u.username, fecha:now, contenido, privada:!!body.addNota?.privada })
+  }
+  if (body.addLinea) {
+    const titulo = String(body.addLinea?.titulo || '').trim()
+    if (!titulo || titulo.length > 160) return err('Linea invalida: titulo requerido (maximo 160)')
+    if (!next.lineas) next.lineas = []
+    next.lineas.push({ id:uuid().slice(0,8), titulo, detalle:String(body.addLinea?.detalle||'').slice(0,1000), estado:['activa','descartada','confirmada'].includes(body.addLinea?.estado)?body.addLinea.estado:'activa', autor:u.username, fecha:now })
+    next.timeline.push({ id:uuid().slice(0,8), fecha:now, accion:'Línea de investigación', detalle:titulo, autor:u.username })
+  }
+  if (body.updateLinea) {
+    if (!next.lineas) next.lineas = []
+    const idx = next.lineas.findIndex((l:any) => l.id === body.updateLinea.id)
+    if (idx >= 0) {
+      next.lineas[idx] = { ...next.lineas[idx], ...body.updateLinea, autor:u.username }
+    }
+  }
+  if (body.removeLinea) {
+    if (!next.lineas) next.lineas = []
+    next.lineas = next.lineas.filter((l:any) => l.id !== body.removeLinea)
+  }
+  if (body.addCasoRelacionado) {
+    const { casoId, numeroCaso, titulo, relacion } = body.addCasoRelacionado
+    if (!casoId || !numeroCaso) return err('casoId y numeroCaso son requeridos')
+    if (!next.casosRelacionados) next.casosRelacionados = []
+    if (!next.casosRelacionados.find((r:any) => r.casoId === casoId)) {
+      next.casosRelacionados.push({ casoId, numeroCaso, titulo:titulo||'', relacion:relacion||'relacionado', fecha:now, autor:u.username })
+      next.timeline.push({ id:uuid().slice(0,8), fecha:now, accion:'Caso relacionado vinculado', detalle:`${numeroCaso} — ${titulo||''}`, autor:u.username })
+      // Auto-vincular el otro caso (best-effort)
+      try {
+        const otherCaso = CasosDB.get(casoId)
+        if (otherCaso) {
+          if (!otherCaso.casosRelacionados) otherCaso.casosRelacionados = []
+          if (!otherCaso.casosRelacionados.find((r:any) => r.casoId === id)) {
+            otherCaso.casosRelacionados.push({ casoId:id, numeroCaso:next.numeroCaso, titulo:next.titulo, relacion:relacion||'relacionado', fecha:now, autor:u.username })
+            otherCaso.timeline = [...(otherCaso.timeline||[]), { id:uuid().slice(0,8), fecha:now, accion:'Caso relacionado vinculado', detalle:`${next.numeroCaso} — ${next.titulo}`, autor:u.username }]
+            otherCaso.actualizadoEn = now
+            await persistCaso(otherCaso)
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
+  }
+  if (body.removeCasoRelacionado) {
+    if (!next.casosRelacionados) next.casosRelacionados = []
+    next.casosRelacionados = next.casosRelacionados.filter((r:any) => r.casoId !== body.removeCasoRelacionado)
+    // Auto-desvincular el otro caso (bidireccional)
+    try {
+      const otherCaso = CasosDB.get(body.removeCasoRelacionado)
+      if (otherCaso) {
+        otherCaso.casosRelacionados = (otherCaso.casosRelacionados || []).filter((r:any) => r.casoId !== id)
+        otherCaso.timeline = [...(otherCaso.timeline||[]), { id:uuid().slice(0,8), fecha:now, accion:'Vínculo eliminado', detalle:`Desvinculado de ${next.numeroCaso}`, autor:u.username }]
+        otherCaso.actualizadoEn = now
+        await persistCaso(otherCaso)
+      }
+    } catch { /* non-fatal */ }
   }
   if (body.addTimeline) {
     const accion = String(body.addTimeline?.accion || '').trim()

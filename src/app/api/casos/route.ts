@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const estado = searchParams.get('estado')
   const unidad = searchParams.get('unidad')
+  const q = searchParams.get('q')?.toLowerCase()
 
   const CasosDB = await getCasosDB()
   let lista = Array.from(CasosDB.values())
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
   if (u.rol === 'visitante') lista = lista.filter(c => c.clasificacion !== 'confidencial')
   if (estado) lista = lista.filter(c => c.estado === estado)
   if (unidad) lista = lista.filter(c => c.unidad === unidad)
+  if (q) lista = lista.filter(c => c.titulo.toLowerCase().includes(q) || c.numeroCaso.toLowerCase().includes(q))
   lista.sort((a,b) => new Date(b.creadoEn).getTime() - new Date(a.creadoEn).getTime())
   return NextResponse.json(lista)
 }
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
     unidad: unidad||'General', agenteLead: u.username,
     agentesAsignados: agentesAsignados||[u.username],
     agentesAcceso: agentesAsignados||[u.username],
-    sospechosos:[], evidencias:[], notas:[], timeline:[
+    sospechosos:[], evidencias:[], notas:[], lineas:[], casosRelacionados:[], timeline:[
       { id:uuid().slice(0,8), fecha:now, accion:'Caso abierto', detalle:`Caso creado por ${u.nombre||u.username}`, autor:u.username }
     ],
     clasificacion: clasificacion||'interno',
