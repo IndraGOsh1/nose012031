@@ -388,7 +388,42 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
               </>}
 
               {tab === 'hallazgos' && <>
-                {alls.length === 0 && <div className="fib-panel-card p-8 text-center" style={{ opacity: 0.4 }}><Camera size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin allanamientos vinculados — los hallazgos y álbum van aquí</p></div>}
+                {alls.length === 0 && (
+                  <div className="flex flex-col gap-4">
+                    <div className="fib-panel-card p-6 text-center" style={{ opacity: 0.5 }}><Camera size={24} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin allanamientos vinculados — los hallazgos de allanamiento van aquí</p><p className="font-mono text-[9px] mt-1" style={{ color: '#4A5560' }}>Vincula allanamientos desde el módulo indicando este caso</p></div>
+                    {canEdit && (
+                      <div className="fib-panel-card">
+                        <div className="fib-panel-card-header">// registrar evidencia directa del caso</div>
+                        <div className="fib-panel-card-body flex flex-col gap-2">
+                          {(caso.evidencias || []).map((ev: any) => (
+                            <div key={ev.id} className="fib-entry-item" style={{ borderLeftColor: '#F1C40F' }}>
+                              <div className="flex items-center justify-between mb-1"><p className="font-bold text-xs uppercase" style={{ color: '#E6ECF2' }}>{ev.titulo}</p><span className="font-mono text-[8px] px-2 py-0.5" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{ev.tipo}</span></div>
+                              {ev.descripcion && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{ev.descripcion}</p>}
+                              {ev.url && <a href={ev.url} target="_blank" rel="noreferrer" className="font-mono text-[9px] mt-1 flex items-center gap-1" style={{ color: '#1B6FFF' }}><ExternalLink size={9} />{ev.url.slice(0, 60)}</a>}
+                            </div>
+                          ))}
+                          {(caso.evidencias || []).length === 0 && <p className="font-mono text-[9px] opacity-40">Sin evidencias registradas aún</p>}
+                          <div style={{ borderTop: '1px solid #1B2229', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <p className="fib-section-label" style={{ margin: 0, fontSize: 9 }}>// agregar evidencia</p>
+                            <input className="fib-form-ctrl" id="hev-titulo" placeholder="Título de la evidencia *" />
+                            <input className="fib-form-ctrl" id="hev-tipo" placeholder="Tipo (imagen, documento, video, otro...)" />
+                            <textarea className="fib-form-ctrl" id="hev-desc" rows={2} placeholder="Descripción" style={{ resize: 'none' }} />
+                            <input className="fib-form-ctrl" id="hev-url" placeholder="URL (Imgur, Drive, etc.) — opcional" />
+                            <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
+                              const titulo = (document.getElementById('hev-titulo') as HTMLInputElement)?.value?.trim()
+                              if (!titulo) return
+                              const tipo = (document.getElementById('hev-tipo') as HTMLInputElement)?.value?.trim() || 'otro'
+                              const descripcion = (document.getElementById('hev-desc') as HTMLTextAreaElement)?.value?.trim() || ''
+                              const url = (document.getElementById('hev-url') as HTMLInputElement)?.value?.trim() || undefined
+                              action({ addEvidencia: { titulo, tipo, descripcion, url } }, 'Evidencia registrada');
+                              ['hev-titulo','hev-tipo','hev-desc','hev-url'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
+                            }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR EVIDENCIA'}</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {alls.map((a: any) => {
                   const hallazgoMsgs = (a.mensajes || []).filter((m: any) => m.tipo === 'informe')
                   const album = a.albumFotos || []
