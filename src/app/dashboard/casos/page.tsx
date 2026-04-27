@@ -621,7 +621,6 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
                   )
                 })}
               </>}
-              </>}
             </div>
           )}
         </div>
