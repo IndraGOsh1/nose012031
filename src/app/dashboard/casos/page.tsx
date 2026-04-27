@@ -239,7 +239,7 @@ function NotasChat({ notas, user, canEdit, onAdd }: { notas: any[]; user: any; c
 
 function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: string; user: any; onClose: () => void; onUpdate: (m: string) => void; onError: (m: string) => void }) {
   const [caso, setCaso] = useState<any>(null)
-  const [tab, setTab] = useState<'notas' | 'info' | 'sospechosos' | 'allanamientos' | 'hallazgos' | 'timeline' | 'evidencias' | 'lineas' | 'relacionados'>('notas')
+  const [tab, setTab] = useState<'notas' | 'info' | 'sospechosos' | 'operaciones' | 'evidencias'>('notas')
   const [showAccess, setShowAccess] = useState(false)
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false)
   const [alls, setAlls] = useState<any[]>([])
@@ -296,16 +296,13 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
   )
   if (!caso) return null
 
+  const totalEvidencias = (caso.evidencias?.length || 0) + alls.reduce((s: number, a: any) => s + (a.albumFotos?.length || 0) + (a.mensajes?.filter((m: any) => m.tipo === 'informe').length || 0), 0)
   const TABS = [
-    { id: 'notas' as const, label: 'Notas', icon: <MessageSquare size={11} />, count: caso.notas?.filter((n: any) => !n.privada || isCS || n.autor === user?.username).length },
-    { id: 'info' as const, label: 'Información', icon: <FileSearch size={11} /> },
-    { id: 'sospechosos' as const, label: 'Sospechosos', icon: <User size={11} />, count: caso.sospechosos?.length || 0 },
-    { id: 'allanamientos' as const, label: 'Allanamientos', icon: <Shield size={11} />, count: alls.length },
-    { id: 'hallazgos' as const, label: 'Hallazgos / Álbum', icon: <Camera size={11} /> },
-    { id: 'timeline' as const, label: 'Timeline', icon: <Activity size={11} />, count: caso.timeline?.length || 0 },
-    { id: 'evidencias'   as const, label: 'Evidencias',  icon: <FileText size={11} />,   count: caso.evidencias?.length || 0 },
-    { id: 'lineas'       as const, label: 'Líneas',      icon: <GitBranch size={11} />,  count: caso.lineas?.length || 0 },
-    { id: 'relacionados' as const, label: 'Relacionados', icon: <Link2 size={11} />,      count: caso.casosRelacionados?.length || 0 },
+    { id: 'notas'       as const, label: 'Notas',       icon: <MessageSquare size={11} />, count: caso.notas?.filter((n: any) => !n.privada || isCS || n.autor === user?.username).length },
+    { id: 'info'        as const, label: 'Información', icon: <FileSearch size={11} /> },
+    { id: 'sospechosos' as const, label: 'Sospechosos', icon: <User size={11} />,           count: caso.sospechosos?.length || 0 },
+    { id: 'operaciones' as const, label: 'Operaciones', icon: <Shield size={11} />,          count: alls.length },
+    { id: 'evidencias'  as const, label: 'Evidencias',  icon: <Camera size={11} />,          count: totalEvidencias },
   ]
 
   return (
@@ -394,6 +391,80 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
                     </div>
                   </div>
                 )}
+
+                {/* ── Líneas de investigación ── */}
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>// líneas de investigación</span>
+                    <span className="font-mono text-[8px]" style={{ color: '#4A5560' }}>{caso.lineas?.length || 0} activas</span>
+                  </div>
+                  <div className="fib-panel-card-body flex flex-col gap-2">
+                    {(caso.lineas?.length === 0 || !caso.lineas) && <p className="font-mono text-[9px] opacity-40">Sin líneas registradas</p>}
+                    {(caso.lineas || []).map((l: any) => (
+                      <div key={l.id} className="fib-entry-item" style={{ borderLeftColor: l.estado === 'confirmada' ? '#2ECC71' : l.estado === 'descartada' ? '#CC0000' : '#F1C40F' }}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-bold text-xs uppercase tracking-wide" style={{ color: '#E6ECF2' }}>{l.titulo}</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`fib-record-badge ${l.estado === 'confirmada' ? 'fib-rb-activo' : l.estado === 'descartada' ? 'fib-rb-allanamiento' : 'fib-rb-pendiente'}`}>{l.estado}</span>
+                            {canEdit && <>
+                              {l.estado !== 'confirmada' && <button className="font-mono text-[8px] px-1.5 py-0.5 hover:opacity-80" style={{ border: '1px solid #2ECC71', color: '#2ECC71' }} onClick={() => action({ updateLinea: { id: l.id, estado: 'confirmada' } }, 'Línea confirmada')}>✓</button>}
+                              {l.estado !== 'descartada' && <button className="font-mono text-[8px] px-1.5 py-0.5 hover:opacity-80" style={{ border: '1px solid #CC0000', color: '#CC0000' }} onClick={() => action({ updateLinea: { id: l.id, estado: 'descartada' } }, 'Línea descartada')}>✗</button>}
+                              {l.estado !== 'activa' && <button className="font-mono text-[8px] px-1.5 py-0.5 hover:opacity-80" style={{ border: '1px solid #F1C40F', color: '#F1C40F' }} onClick={() => action({ updateLinea: { id: l.id, estado: 'activa' } }, 'Línea reactivada')}>↺</button>}
+                            </>}
+                          </div>
+                        </div>
+                        {l.detalle && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{l.detalle}</p>}
+                        <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>{fmtDT(l.fecha)} · {l.autor}</p>
+                      </div>
+                    ))}
+                    {canEdit && (
+                      <div style={{ borderTop: '1px solid #1B2229', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input className="fib-form-ctrl" id="ln-titulo" placeholder="Título de la línea *" />
+                        <textarea className="fib-form-ctrl" id="ln-detalle" rows={2} placeholder="Detalle, hipótesis, pistas..." style={{ resize: 'none' }} />
+                        <select className="fib-form-ctrl" id="ln-estado"><option value="activa">Activa</option><option value="confirmada">Confirmada</option><option value="descartada">Descartada</option></select>
+                        <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
+                          const titulo = (document.getElementById('ln-titulo') as HTMLInputElement)?.value?.trim()
+                          if (!titulo) return
+                          const detalle = (document.getElementById('ln-detalle') as HTMLTextAreaElement)?.value?.trim() || ''
+                          const estado = (document.getElementById('ln-estado') as HTMLSelectElement)?.value || 'activa'
+                          action({ addLinea: { titulo, detalle, estado } }, 'Línea registrada');
+                          ['ln-titulo','ln-detalle'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
+                        }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR LÍNEA'}</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Casos relacionados ── */}
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>// casos relacionados</span>
+                    <span className="font-mono text-[8px]" style={{ color: '#4A5560' }}>{caso.casosRelacionados?.length || 0} vínculo(s)</span>
+                  </div>
+                  <div className="fib-panel-card-body flex flex-col gap-2">
+                    {(caso.casosRelacionados?.length === 0 || !caso.casosRelacionados) && <p className="font-mono text-[9px] opacity-40">Sin casos vinculados</p>}
+                    {(caso.casosRelacionados || []).map((r: any) => (
+                      <div key={r.casoId} className="fib-hilo-item" style={{ cursor: 'pointer' }} onClick={() => { onClose(); setTimeout(() => document.dispatchEvent(new CustomEvent('fib:openCaso', { detail: r.casoId })), 100) }}>
+                        <div className="fib-hilo-top">
+                          <div className="fib-hilo-title"><span className="fib-hilo-type fib-ht-allanamiento">CASO</span>{r.titulo}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[8px] px-2 py-0.5 uppercase" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{r.relacion}</span>
+                            {canEdit && <button className="hover:text-red-400 transition-colors" style={{ color: '#4A5560' }} onClick={e => { e.stopPropagation(); action({ removeCasoRelacionado: r.casoId }, 'Vínculo eliminado') }}><X size={10} /></button>}
+                          </div>
+                        </div>
+                        <div className="fib-hilo-meta">{r.numeroCaso} · vinculado por {r.autor} · {fmtDate(r.fecha)}</div>
+                      </div>
+                    ))}
+                    {canEdit && (
+                      <div style={{ borderTop: '1px solid #1B2229', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <CasoSearch currentId={casoId} onSelect={c => {
+                          action({ addCasoRelacionado: { casoId: c.id, numeroCaso: c.numeroCaso, titulo: c.titulo, relacion: (document.getElementById('rel-tipo') as HTMLSelectElement)?.value || 'relacionado' } }, `Caso ${c.numeroCaso} vinculado`)
+                        }} />
+                        <select className="fib-form-ctrl" id="rel-tipo"><option value="relacionado">Relacionado</option><option value="rama">Rama / derivado</option><option value="paralelo">Paralelo</option><option value="antecedente">Antecedente</option></select>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </>}
 
               {tab === 'sospechosos' && <>
@@ -411,29 +482,110 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
                 {canEdit && <div className="fib-panel-card"><div className="fib-panel-card-header">// agregar sospechoso</div><div className="fib-panel-card-body"><SospechosoForm onAdd={d => action({ addSospechoso: d }, 'Sospechoso registrado')} /></div></div>}
               </>}
 
-              {tab === 'allanamientos' && <>
-                {alls.length === 0 && <div className="fib-panel-card p-10 text-center" style={{ opacity: 0.4 }}><Shield size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin allanamientos vinculados a este caso</p><p className="font-mono text-[9px] mt-1" style={{ color: '#4A5560' }}>Vincula allanamientos desde el módulo de Allanamientos indicando este caso</p></div>}
-                {alls.map((a: any) => (
-                  <div key={a.id} className="fib-hilo-item">
-                    <div className="fib-hilo-top"><div className="fib-hilo-title"><span className="fib-hilo-type fib-ht-allanamiento">ALLANAMIENTO</span>{a.direccion}</div><div className="fib-hilo-meta">{fmtDate(a.fechaSolicitud)}</div></div>
-                    <div className="fib-hilo-preview">{a.motivacion?.slice(0, 120)}{a.motivacion?.length > 120 ? '...' : ''}</div>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className={`fib-record-badge ${a.estado === 'autorizado' || a.estado === 'ejecutado' ? 'fib-rb-activo' : a.estado === 'denegado' ? 'fib-rb-allanamiento' : 'fib-rb-pendiente'}`}>{a.estado}</span>
-                      <span className="font-mono text-[9px]" style={{ color: '#8A96A3' }}>Solicitud: {a.numeroSolicitud?.split('//').pop()?.trim() || a.numeroSolicitud}</span>
-                      {a.firmas?.length > 0 && <span className="font-mono text-[9px]" style={{ color: '#2ECC71' }}>✓ {a.firmas.length} firma(s)</span>}
-                    </div>
+              {tab === 'operaciones' && <>
+                {/* ── Allanamientos ── */}
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>// allanamientos vinculados</span>
+                    <span className="font-mono text-[8px]" style={{ color: '#4A5560' }}>{alls.length} registro(s)</span>
                   </div>
-                ))}
+                  <div className="fib-panel-card-body flex flex-col gap-3">
+                    {alls.length === 0 && <p className="font-mono text-[9px] opacity-40">Sin allanamientos — vincúlalos desde el módulo de Allanamientos indicando este caso</p>}
+                    {alls.map((a: any) => (
+                      <div key={a.id} className="fib-hilo-item">
+                        <div className="fib-hilo-top"><div className="fib-hilo-title"><span className="fib-hilo-type fib-ht-allanamiento">ALLANAMIENTO</span>{a.direccion}</div><div className="fib-hilo-meta">{fmtDate(a.fechaSolicitud)}</div></div>
+                        <div className="fib-hilo-preview">{a.motivacion?.slice(0, 120)}{a.motivacion?.length > 120 ? '...' : ''}</div>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className={`fib-record-badge ${a.estado === 'autorizado' || a.estado === 'ejecutado' ? 'fib-rb-activo' : a.estado === 'denegado' ? 'fib-rb-allanamiento' : 'fib-rb-pendiente'}`}>{a.estado}</span>
+                          <span className="font-mono text-[9px]" style={{ color: '#8A96A3' }}>Solicitud: {a.numeroSolicitud?.split('//').pop()?.trim() || a.numeroSolicitud}</span>
+                          {a.firmas?.length > 0 && <span className="font-mono text-[9px]" style={{ color: '#2ECC71' }}>✓ {a.firmas.length} firma(s)</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Timeline ── */}
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header">// timeline del caso</div>
+                  <div className="fib-panel-card-body flex flex-col gap-1">
+                    {(caso.timeline?.length === 0 || !caso.timeline) && <p className="font-mono text-[9px] opacity-40">Sin entradas en el timeline</p>}
+                    {caso.timeline?.slice().reverse().map((t: any) => (
+                      <div key={t.id} style={{ position: 'relative', paddingLeft: 20, paddingBottom: 8 }}>
+                        <div style={{ position: 'absolute', left: 0, top: 6, width: 8, height: 8, borderRadius: '50%', border: '1px solid rgba(27,111,255,0.6)', background: 'rgba(27,111,255,0.25)' }} />
+                        <div style={{ position: 'absolute', left: 4, top: 14, bottom: 0, width: 1, background: 'linear-gradient(to bottom, rgba(27,111,255,0.3), transparent)' }} />
+                        <div className="fib-entry-item" style={{ borderLeftColor: '#1B2229', marginLeft: 6 }}>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="font-mono text-[9px] uppercase tracking-widest" style={{ color: '#1B6FFF' }}>{t.accion}</p>
+                            <span className="font-mono text-[7px] ml-auto whitespace-nowrap" style={{ color: '#4A5560' }}>{fmtDT(t.fecha)}</span>
+                          </div>
+                          {t.detalle && <p className="text-xs" style={{ color: '#8A96A3' }}>{t.detalle}</p>}
+                          <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>por {t.autor}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {canEdit && (
+                      <div style={{ borderTop: '1px solid #1B2229', paddingTop: 10, marginTop: 4, display: 'flex', gap: 8 }}>
+                        <input className="fib-form-ctrl flex-1" id="tl-a" placeholder="Acción (ej: Operativo realizado)" />
+                        <input className="fib-form-ctrl flex-1" id="tl-d" placeholder="Detalle" />
+                        <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap' }} onClick={() => {
+                          const a = (document.getElementById('tl-a') as HTMLInputElement)?.value?.trim()
+                          const d = (document.getElementById('tl-d') as HTMLInputElement)?.value?.trim()
+                          if (a) { action({ addTimeline: { accion: a, detalle: d } }, 'Entrada agregada'); (document.getElementById('tl-a') as HTMLInputElement).value = ''; (document.getElementById('tl-d') as HTMLInputElement).value = '' }
+                        }}>+ AÑADIR</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </>}
 
-              {tab === 'hallazgos' && <>
-                {alls.length === 0 && <div className="fib-panel-card p-8 text-center" style={{ opacity: 0.4 }}><Camera size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin allanamientos vinculados — los hallazgos y álbum van aquí</p><p className="font-mono text-[9px] mt-1" style={{ color: '#4A5560' }}>Vincula allanamientos desde el módulo de Allanamientos indicando este caso</p></div>}
+              {tab === 'evidencias' && <>
+                {/* ── Evidencias directas del caso ── */}
+                <div className="fib-panel-card">
+                  <div className="fib-panel-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>// evidencias del caso</span>
+                    <span className="font-mono text-[8px]" style={{ color: '#4A5560' }}>{caso.evidencias?.length || 0} registro(s)</span>
+                  </div>
+                  <div className="fib-panel-card-body flex flex-col gap-2">
+                    {(caso.evidencias?.length === 0 || !caso.evidencias) && <p className="font-mono text-[9px] opacity-40">Sin evidencias registradas aún</p>}
+                    {(caso.evidencias || []).map((ev: any) => (
+                      <div key={ev.id} className="fib-entry-item" style={{ borderLeftColor: '#F1C40F' }}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-bold text-xs uppercase tracking-wide" style={{ color: '#E6ECF2' }}>{ev.titulo}</p>
+                          <span className="font-mono text-[8px] px-2 py-0.5" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{ev.tipo}</span>
+                        </div>
+                        {ev.descripcion && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{ev.descripcion}</p>}
+                        <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>por {ev.subidoPor}</p>
+                        {ev.url && <a href={ev.url} target="_blank" rel="noreferrer" className="font-mono text-[9px] mt-1 flex items-center gap-1" style={{ color: '#1B6FFF' }}><ExternalLink size={9} />{ev.url.length > 60 ? ev.url.slice(0, 60) + '...' : ev.url}</a>}
+                      </div>
+                    ))}
+                    {canEdit && (
+                      <div style={{ borderTop: '1px solid #1B2229', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input className="fib-form-ctrl" id="ev-titulo" placeholder="Título de la evidencia *" />
+                        <input className="fib-form-ctrl" id="ev-tipo" placeholder="Tipo (imagen, documento, video, otro...)" />
+                        <textarea className="fib-form-ctrl" id="ev-desc" rows={2} placeholder="Descripción" style={{ resize: 'none' }} />
+                        <input className="fib-form-ctrl" id="ev-url" placeholder="URL (Imgur, Drive, etc.) — opcional" />
+                        <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
+                          const titulo = (document.getElementById('ev-titulo') as HTMLInputElement)?.value?.trim()
+                          if (!titulo) return
+                          const tipo = (document.getElementById('ev-tipo') as HTMLInputElement)?.value?.trim() || 'otro'
+                          const descripcion = (document.getElementById('ev-desc') as HTMLTextAreaElement)?.value?.trim() || ''
+                          const url = (document.getElementById('ev-url') as HTMLInputElement)?.value?.trim() || undefined
+                          action({ addEvidencia: { titulo, tipo, descripcion, url } }, 'Evidencia registrada');
+                          ['ev-titulo','ev-tipo','ev-desc','ev-url'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
+                        }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR EVIDENCIA'}</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Hallazgos por allanamiento ── */}
                 {alls.map((a: any) => {
                   const hallazgoMsgs = (a.mensajes || []).filter((m: any) => m.tipo === 'informe')
                   const album = a.albumFotos || []
                   return (
                     <div key={a.id} className="fib-panel-card">
-                      <div className="fib-panel-card-header">// {a.direccion}</div>
+                      <div className="fib-panel-card-header">// allanamiento · {a.direccion}</div>
                       <div className="fib-panel-card-body flex flex-col gap-3">
                         {hallazgoMsgs.length === 0 && album.length === 0 && <p className="font-mono text-[9px] opacity-40">Sin hallazgos registrados en este allanamiento</p>}
                         {hallazgoMsgs.map((m: any) => (
@@ -444,7 +596,7 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
                         ))}
                         {album.length > 0 && (
                           <div>
-                            <p className="font-mono text-[9px] uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: '#1B6FFF' }}><Image size={10} /> Álbum de evidencia ({album.length} fotos)</p>
+                            <p className="font-mono text-[9px] uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: '#1B6FFF' }}><Image size={10} /> Álbum ({album.length} fotos)</p>
                             <div className="grid grid-cols-3 gap-2">
                               {album.map((url: string, i: number) => isImgUrl(url) ? (
                                 <a key={i} href={normalizeImgUrl(url)} target="_blank" rel="noreferrer" className="block border overflow-hidden hover:opacity-90 transition-opacity" style={{ borderColor: '#1B2229' }}>
@@ -468,170 +620,7 @@ function ModalCaso({ casoId, user, onClose, onUpdate, onError }: { casoId: strin
                     </div>
                   )
                 })}
-                {canEdit && alls.length > 0 && (
-                  <div className="fib-panel-card">
-                    <div className="fib-panel-card-header">// evidencia directa del caso</div>
-                    <div className="fib-panel-card-body flex flex-col gap-2">
-                      {(caso.evidencias || []).length === 0 && <p className="font-mono text-[9px] opacity-40">Sin evidencias del caso registradas aún</p>}
-                      {(caso.evidencias || []).map((ev: any) => (
-                        <div key={ev.id} className="fib-entry-item" style={{ borderLeftColor: '#F1C40F' }}>
-                          <div className="flex items-center justify-between mb-1"><p className="font-bold text-xs uppercase" style={{ color: '#E6ECF2' }}>{ev.titulo}</p><span className="font-mono text-[8px] px-2 py-0.5" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{ev.tipo}</span></div>
-                          {ev.descripcion && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{ev.descripcion}</p>}
-                          {ev.url && <a href={ev.url} target="_blank" rel="noreferrer" className="font-mono text-[9px] mt-1 flex items-center gap-1" style={{ color: '#1B6FFF' }}><ExternalLink size={9} />{ev.url.slice(0, 60)}</a>}
-                        </div>
-                      ))}
-                      <div style={{ borderTop: '1px solid #1B2229', paddingTop: 10, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <input className="fib-form-ctrl" id="cev-titulo" placeholder="Título de la evidencia *" />
-                        <input className="fib-form-ctrl" id="cev-tipo" placeholder="Tipo (imagen, documento, video, otro...)" />
-                        <textarea className="fib-form-ctrl" id="cev-desc" rows={2} placeholder="Descripción" style={{ resize: 'none' }} />
-                        <input className="fib-form-ctrl" id="cev-url" placeholder="URL (Imgur, Drive, etc.) — opcional" />
-                        <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
-                          const titulo = (document.getElementById('cev-titulo') as HTMLInputElement)?.value?.trim()
-                          if (!titulo) return
-                          const tipo = (document.getElementById('cev-tipo') as HTMLInputElement)?.value?.trim() || 'otro'
-                          const descripcion = (document.getElementById('cev-desc') as HTMLTextAreaElement)?.value?.trim() || ''
-                          const url = (document.getElementById('cev-url') as HTMLInputElement)?.value?.trim() || undefined
-                          action({ addEvidencia: { titulo, tipo, descripcion, url } }, 'Evidencia registrada');
-                          ['cev-titulo','cev-tipo','cev-desc','cev-url'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
-                        }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR EVIDENCIA DEL CASO'}</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </>}
-
-              {tab === 'timeline' && <>
-                {caso.timeline?.slice().reverse().map((t: any) => (
-                  <div key={t.id} style={{ position: 'relative', paddingLeft: 24, paddingBottom: 8 }}>
-                    <div style={{ position: 'absolute', left: 0, top: 6, width: 10, height: 10, borderRadius: '50%', border: '1px solid rgba(27,111,255,0.6)', background: 'rgba(27,111,255,0.25)' }} />
-                    <div style={{ position: 'absolute', left: 5, top: 16, bottom: 0, width: 1, background: 'linear-gradient(to bottom, rgba(27,111,255,0.4), transparent)' }} />
-                    <div className="fib-entry-item" style={{ borderLeftColor: '#1B2229', marginLeft: 8 }}>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="font-mono text-[9px] uppercase tracking-widest" style={{ color: '#1B6FFF' }}>{t.accion}</p>
-                        <span className="font-mono text-[7px] ml-auto whitespace-nowrap" style={{ color: '#4A5560' }}>{fmtDT(t.fecha)}</span>
-                      </div>
-                      {t.detalle && <p className="text-xs" style={{ color: '#8A96A3' }}>{t.detalle}</p>}
-                      <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>por {t.autor}</p>
-                    </div>
-                  </div>
-                ))}
-                {canEdit && (
-                  <div className="fib-panel-card mt-2">
-                    <div className="fib-panel-card-header">// agregar entrada al timeline</div>
-                    <div className="fib-panel-card-body flex gap-2">
-                      <input className="fib-form-ctrl flex-1" id="tl-a" placeholder="Acción (ej: Operativo realizado)" />
-                      <input className="fib-form-ctrl flex-1" id="tl-d" placeholder="Detalle" />
-                      <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap' }} onClick={() => {
-                        const a = (document.getElementById('tl-a') as HTMLInputElement)?.value?.trim()
-                        const d = (document.getElementById('tl-d') as HTMLInputElement)?.value?.trim()
-                        if (a) { action({ addTimeline: { accion: a, detalle: d } }, 'Entrada agregada'); (document.getElementById('tl-a') as HTMLInputElement).value = ''; (document.getElementById('tl-d') as HTMLInputElement).value = '' }
-                      }}>+ AÑADIR</button>
-                    </div>
-                  </div>
-                )}
-              </>}
-
-              {tab === 'evidencias' && <>
-                {(caso.evidencias?.length === 0 || !caso.evidencias) && <div className="fib-panel-card p-10 text-center" style={{ opacity: 0.4 }}><FileText size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin evidencias registradas en este caso</p></div>}
-                {(caso.evidencias || []).map((ev: any) => (
-                  <div key={ev.id} className="fib-entry-item" style={{ borderLeftColor: '#F1C40F' }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-bold text-xs tracking-wide uppercase" style={{ color: '#E6ECF2' }}>{ev.titulo}</p>
-                      <span className="font-mono text-[8px] px-2 py-0.5" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{ev.tipo}</span>
-                    </div>
-                    {ev.descripcion && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{ev.descripcion}</p>}
-                    <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>Subido por {ev.subidoPor}</p>
-                    {ev.url && <a href={ev.url} target="_blank" rel="noreferrer" className="font-mono text-[9px] mt-1 flex items-center gap-1" style={{ color: '#1B6FFF' }}><ExternalLink size={9} />{ev.url.length > 60 ? ev.url.slice(0, 60) + '...' : ev.url}</a>}
-                  </div>
-                ))}
-                {canEdit && (
-                  <div className="fib-panel-card">
-                    <div className="fib-panel-card-header">// registrar evidencia</div>
-                    <div className="fib-panel-card-body flex flex-col gap-2">
-                      <input className="fib-form-ctrl" id="ev-titulo" placeholder="Título de la evidencia *" />
-                      <input className="fib-form-ctrl" id="ev-tipo" placeholder="Tipo (imagen, documento, video, otro...)" />
-                      <textarea className="fib-form-ctrl" id="ev-desc" rows={2} placeholder="Descripción del hallazgo o evidencia" style={{ resize: 'none' }} />
-                      <input className="fib-form-ctrl" id="ev-url" placeholder="URL (Imgur, Drive, etc.) — opcional" />
-                      <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
-                        const titulo = (document.getElementById('ev-titulo') as HTMLInputElement)?.value?.trim()
-                        if (!titulo) return
-                        const tipo = (document.getElementById('ev-tipo') as HTMLInputElement)?.value?.trim() || 'otro'
-                        const descripcion = (document.getElementById('ev-desc') as HTMLTextAreaElement)?.value?.trim() || ''
-                        const url = (document.getElementById('ev-url') as HTMLInputElement)?.value?.trim() || undefined
-                        action({ addEvidencia: { titulo, tipo, descripcion, url } }, 'Evidencia registrada');
-                        ['ev-titulo','ev-tipo','ev-desc','ev-url'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
-                      }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR EVIDENCIA'}</button>
-                    </div>
-                  </div>
-                )}
-              </>}
-
-              {tab === 'lineas' && <>
-                {(caso.lineas?.length === 0 || !caso.lineas) && <div className="fib-panel-card p-10 text-center" style={{ opacity: 0.4 }}><GitBranch size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin líneas de investigación registradas</p></div>}
-                {(caso.lineas || []).map((l: any) => (
-                  <div key={l.id} className="fib-entry-item" style={{ borderLeftColor: l.estado === 'confirmada' ? '#2ECC71' : l.estado === 'descartada' ? '#CC0000' : '#F1C40F' }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="font-bold text-xs uppercase tracking-wide" style={{ color: '#E6ECF2' }}>{l.titulo}</p>
-                      <div className="flex items-center gap-2">
-                        <span className={`fib-record-badge ${l.estado === 'confirmada' ? 'fib-rb-activo' : l.estado === 'descartada' ? 'fib-rb-allanamiento' : 'fib-rb-pendiente'}`}>{l.estado}</span>
-                        {canEdit && (
-                          <div className="flex gap-1">
-                            {l.estado !== 'confirmada' && <button className="font-mono text-[8px] px-1.5 py-0.5 hover:opacity-80" style={{ border: '1px solid #2ECC71', color: '#2ECC71' }} onClick={() => action({ updateLinea: { id: l.id, estado: 'confirmada' } }, 'Línea confirmada')}>✓</button>}
-                            {l.estado !== 'descartada' && <button className="font-mono text-[8px] px-1.5 py-0.5 hover:opacity-80" style={{ border: '1px solid #CC0000', color: '#CC0000' }} onClick={() => action({ updateLinea: { id: l.id, estado: 'descartada' } }, 'Línea descartada')}>✗</button>}
-                            {l.estado !== 'activa' && <button className="font-mono text-[8px] px-1.5 py-0.5 hover:opacity-80" style={{ border: '1px solid #F1C40F', color: '#F1C40F' }} onClick={() => action({ updateLinea: { id: l.id, estado: 'activa' } }, 'Línea reactivada')}>↺</button>}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {l.detalle && <p className="text-xs mt-1" style={{ color: '#8A96A3', whiteSpace: 'pre-wrap' }}>{l.detalle}</p>}
-                    <p className="font-mono text-[8px] mt-1" style={{ color: '#4A5560' }}>{fmtDT(l.fecha)} · {l.autor}</p>
-                  </div>
-                ))}
-                {canEdit && (
-                  <div className="fib-panel-card">
-                    <div className="fib-panel-card-header">// agregar línea de investigación</div>
-                    <div className="fib-panel-card-body flex flex-col gap-2">
-                      <input className="fib-form-ctrl" id="ln-titulo" placeholder="Título de la línea *" />
-                      <textarea className="fib-form-ctrl" id="ln-detalle" rows={2} placeholder="Detalle, hipótesis, pistas..." style={{ resize: 'none' }} />
-                      <select className="fib-form-ctrl" id="ln-estado"><option value="activa">Activa</option><option value="confirmada">Confirmada</option><option value="descartada">Descartada</option></select>
-                      <button className="fib-add-btn" style={{ borderRadius: 4, fontSize: 11 }} disabled={saving} onClick={() => {
-                        const titulo = (document.getElementById('ln-titulo') as HTMLInputElement)?.value?.trim()
-                        if (!titulo) return
-                        const detalle = (document.getElementById('ln-detalle') as HTMLTextAreaElement)?.value?.trim() || ''
-                        const estado = (document.getElementById('ln-estado') as HTMLSelectElement)?.value || 'activa'
-                        action({ addLinea: { titulo, detalle, estado } }, 'Línea registrada');
-                        ['ln-titulo','ln-detalle'].forEach(id => { const el = document.getElementById(id) as HTMLInputElement; if (el) el.value = '' })
-                      }}>{saving ? 'GUARDANDO...' : '+ REGISTRAR LÍNEA'}</button>
-                    </div>
-                  </div>
-                )}
-              </>}
-
-              {tab === 'relacionados' && <>
-                {(caso.casosRelacionados?.length === 0 || !caso.casosRelacionados) && <div className="fib-panel-card p-10 text-center" style={{ opacity: 0.4 }}><Link2 size={28} className="mx-auto mb-2" /><p className="font-mono text-xs">Sin casos relacionados vinculados</p></div>}
-                {(caso.casosRelacionados || []).map((r: any) => (
-                  <div key={r.casoId} className="fib-hilo-item" style={{ cursor: 'pointer' }} onClick={() => { onClose(); setTimeout(() => document.dispatchEvent(new CustomEvent('fib:openCaso', { detail: r.casoId })), 100) }}>
-                    <div className="fib-hilo-top">
-                      <div className="fib-hilo-title"><span className="fib-hilo-type fib-ht-allanamiento">CASO</span>{r.titulo}</div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[8px] px-2 py-0.5 uppercase" style={{ border: '1px solid #2A3540', color: '#8A96A3' }}>{r.relacion}</span>
-                        {canEdit && <button className="hover:text-red-400 transition-colors" style={{ color: '#4A5560' }} onClick={e => { e.stopPropagation(); action({ removeCasoRelacionado: r.casoId }, 'Vínculo eliminado') }}><X size={10} /></button>}
-                      </div>
-                    </div>
-                    <div className="fib-hilo-meta">{r.numeroCaso} · vinculado por {r.autor} · {fmtDate(r.fecha)}</div>
-                  </div>
-                ))}
-                {canEdit && (
-                  <div className="fib-panel-card">
-                    <div className="fib-panel-card-header">// vincular caso relacionado</div>
-                    <div className="fib-panel-card-body flex flex-col gap-2">
-                      <CasoSearch currentId={casoId} onSelect={c => {
-                        action({ addCasoRelacionado: { casoId: c.id, numeroCaso: c.numeroCaso, titulo: c.titulo, relacion: (document.getElementById('rel-tipo') as HTMLSelectElement)?.value || 'relacionado' } }, `Caso ${c.numeroCaso} vinculado`)
-                      }} />
-                      <select className="fib-form-ctrl" id="rel-tipo"><option value="relacionado">Relacionado</option><option value="rama">Rama / derivado</option><option value="paralelo">Paralelo</option><option value="antecedente">Antecedente</option></select>
-                    </div>
-                  </div>
-                )}
               </>}
             </div>
           )}
